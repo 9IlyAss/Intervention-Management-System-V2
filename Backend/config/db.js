@@ -7,7 +7,6 @@ const ConnectDB= async () =>{
             socketTimeoutMS: 45000}           // Keep alive
             
         )
-        
         console.log("Connection Successe ! ")
     } catch (error) {
         console.log("Connection Failed ",error)

@@ -18,6 +18,10 @@ const InterventionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
+  location: {
+    type: String,
+    trim: true // Removes extra whitespace
+  },
   status: {
     type: String,
     enum: ['Pending', 'In Progress', 'Completed', 'Cancelled'],
