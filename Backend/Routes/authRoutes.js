@@ -2,6 +2,9 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");  // Ensure correct path for User model
+const Client = require("../models/Client");
+const Technician = require("../models/Technician");
+const Administrator = require("../models/Administrator");
 const Router = express.Router();
 const {protect} = require("../middleware/authMiddleware") // Assuming you have middleware for authorization
 
@@ -9,15 +12,14 @@ const {protect} = require("../middleware/authMiddleware") // Assuming you have m
 // @desc Register a new user
 // @access Public
 Router.post("/register", async (req, res) => {
-    const { name, email, password, phone } = req.body;
+    const { name, email, password, phone , role = 'client' } = req.body;
 
     try {
         // Check if the user already exists
         let user = await User.findOne({ email });
         if (user) return res.status(400).json({ message: "User already exists" });
-
         // Create new user
-        let newUser = new User({ name, email, password, phone });
+        let newUser = new Client({ name, email, password, phone , role });
 
         // Save the user
         await newUser.save();

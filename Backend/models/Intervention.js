@@ -27,20 +27,6 @@ const InterventionSchema = new mongoose.Schema({
     enum: ['Pending', 'In Progress', 'Completed', 'Cancelled'],
     default: 'Pending'
   },
-  feedback: {
-    rating: {
-      type: Number,
-      min: 1,
-      max: 5
-    },
-    comment: {
-      type: String
-    },
-    date: {
-      type: Date,
-      default: Date.now
-    }
-  },
   createdAt: {
     type: Date,
     default: Date.now

@@ -2,11 +2,6 @@
 const mongoose = require('mongoose');
 
 const MessageSchema = new mongoose.Schema({
-  chatRoomId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'ChatRoom',
-    required: true
-  },
   senderId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -14,13 +9,15 @@ const MessageSchema = new mongoose.Schema({
   },
   content: {
     type: String,
-    required: true
+    required: true,
+    trim: true,
+    maxlength: 1000
   },
-  timestamp: {
-    type: Date,
-    default: Date.now
+  read: {
+    type: Boolean,
+    default: false
   }
-});
+}, { timestamps: true });
 
 const ChatRoomSchema = new mongoose.Schema({
   clientId: {
@@ -33,27 +30,8 @@ const ChatRoomSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  messagesList: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Message'
-  }],
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+  messages: [MessageSchema] // Embedded messages
+}, { timestamps: true });
 
-// Update the updatedAt field on save
-ChatRoomSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
-
-const Message = mongoose.model('Message', MessageSchema);
 const ChatRoom = mongoose.model('ChatRoom', ChatRoomSchema);
-
-module.exports = { ChatRoom, Message };
+module.exports = ChatRoom;
