@@ -15,6 +15,7 @@ Router.post('/submit', protect, async (req, res) => {
         if (!title || !description) {
             return res.status(400).json({ error: 'Title and description are required' });
         }
+        
         const newIntervention = new Intervention({
             title,
             description,
@@ -119,30 +120,34 @@ Router.post('/chat/:technicianId', protect, async (req, res) => {
         }
 
         let chatRoom = await ChatRoom.findOne({
-            clientId: req.user.id,
-            technicianId: req.params.technicianId
+            'participants.clientId': req.user.id,
+            'participants.technicianId': req.params.technicianId
         });
 
         if (!chatRoom) {
-            chatRoom = new ChatRoom({ 
-                clientId: req.user.id, 
-                technicianId: req.params.technicianId 
+            // Create a new chat room if it doesn't exist
+            chatRoom = new ChatRoom({
+                participants: {
+                    clientId: req.user.id,
+                    technicianId: req.params.technicianId
+                },
+                messages: [] // Initialize an empty message array
             });
             await chatRoom.save();
         }
 
-        const newMessage = new Message({
-            chatRoomId: chatRoom._id,
+        // Add the new message to the chat room's message array
+        chatRoom.messages.push({
             senderId: req.user.id,
-            content: message.trim(),
+            content: message.trim()
         });
 
-        await newMessage.save();
+        await chatRoom.save();
         
-        // Emit real-time event if using Socket.io
+        // Optional: Emit real-time event if using Socket.io
         // io.to(chatRoom._id).emit('newMessage', newMessage);
         
-        res.status(201).json(newMessage);
+        res.status(201).json(chatRoom);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -154,19 +159,16 @@ Router.post('/chat/:technicianId', protect, async (req, res) => {
 Router.get('/chat/:technicianId', protect, async (req, res) => {
     try {
         const chatRoom = await ChatRoom.findOne({
-            clientId: req.user.id,
-            technicianId: req.params.technicianId
-        });
+            'participants.clientId': req.user.id,
+            'participants.technicianId': req.params.technicianId
+        }).populate('participants.clientId', 'name email phone')
+          .populate('participants.technicianId', 'name email phone');
 
         if (!chatRoom) {
-            return res.json([]); // Return empty array if no chat exists
+            return res.json([]); // Return an empty array if no chat exists
         }
 
-        const messages = await Message.find({ chatRoomId: chatRoom._id })
-            .sort({ createdAt: 1 })
-            .limit(50);
-            
-        res.json(messages);
+        res.json(chatRoom.messages); // Return the messages directly from the chat room
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

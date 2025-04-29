@@ -1,6 +1,6 @@
-// models/ChatRoom.js
 const mongoose = require('mongoose');
 
+// Message Schema (embedded)
 const MessageSchema = new mongoose.Schema({
   senderId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -19,8 +19,9 @@ const MessageSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// ChatRoom Schema
 const ChatRoomSchema = new mongoose.Schema({
-  participants : {
+  participants: {
     clientId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -30,14 +31,16 @@ const ChatRoomSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true
-    },
+    }
   },
-  interventionId :  [{
+  interventionId: {  // ⬅️ Not array
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Intervention'
-  }],
-  messages: [MessageSchema] // Embedded messages
+    ref: 'Intervention',
+    required: true
+  },
+  messages: [MessageSchema]  // Array of embedded messages
 }, { timestamps: true });
 
 const ChatRoom = mongoose.model('ChatRoom', ChatRoomSchema);
+
 module.exports = ChatRoom;

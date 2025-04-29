@@ -1,7 +1,7 @@
 const express = require('express');
 const Intervention = require('../models/Intervention'); // Intervention model
 const Router = express.Router();
-const { protect, admin ,AdTech} = require('../middleware/auth'); // Adjust path as needed
+const { protect, admin ,AdTech} = require('../middleware/authMiddleware'); // Adjust path as needed
 
 // @route Get /api/interventions
 // @desc Get all interventions 
@@ -44,62 +44,62 @@ Router.get('/:id', protect ,AdTech,  async (req, res) => {
 
 
 
-//-----------Futures i will add
+// //-----------Futures i will add
 
-// @route GET /api/admin/reports/technician/:technicianId
-// @desc Get technician's report (number of interventions + average feedback)
-// @access Private (Admin only)
-Router.get("/reports/technician/:technicianId", protect, admin, async (req, res) => {
-  try {
-    const interventions = await Intervention.find({ technicianId: req.params.technicianId, status: 'Completed' });
+// // @route GET /api/admin/reports/technician/:technicianId
+// // @desc Get technician's report (number of interventions + average feedback)
+// // @access Private (Admin only)
+// Router.get("/reports/technician/:technicianId", protect, admin, async (req, res) => {
+//   try {
+//     const interventions = await Intervention.find({ technicianId: req.params.technicianId, status: 'Completed' });
 
-    const total = interventions.length;
-    const avgRating = interventions.reduce((acc, curr) => acc + (curr.feedback?.rating || 0), 0) / (total || 1);
+//     const total = interventions.length;
+//     const avgRating = interventions.reduce((acc, curr) => acc + (curr.feedback?.rating || 0), 0) / (total || 1);
 
-    res.json({ totalInterventions: total, averageRating: avgRating.toFixed(2) });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
+//     res.json({ totalInterventions: total, averageRating: avgRating.toFixed(2) });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
 
 
-// @route GET /api/admin/reports/client/:clientId
-// @desc Get client's report (number of requests + average satisfaction)
-// @access Private (Admin only)
-Router.get("/reports/client/:clientId", protect, admin, async (req, res) => {
-  try {
-    const interventions = await Intervention.find({ clientId: req.params.clientId });
+// // @route GET /api/admin/reports/client/:clientId
+// // @desc Get client's report (number of requests + average satisfaction)
+// // @access Private (Admin only)
+// Router.get("/reports/client/:clientId", protect, admin, async (req, res) => {
+//   try {
+//     const interventions = await Intervention.find({ clientId: req.params.clientId });
 
-    const total = interventions.length;
-    const avgRating = interventions.reduce((acc, curr) => acc + (curr.feedback?.rating || 0), 0) / (total || 1);
+//     const total = interventions.length;
+//     const avgRating = interventions.reduce((acc, curr) => acc + (curr.feedback?.rating || 0), 0) / (total || 1);
 
-    res.json({ totalRequests: total, averageSatisfaction: avgRating.toFixed(2) });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
+//     res.json({ totalRequests: total, averageSatisfaction: avgRating.toFixed(2) });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
 
-const { Parser } = require('json2csv');
+// const { Parser } = require('json2csv');
 
-Router.get("/reports/export/csv", protect, admin, async (req, res) => {
-  try {
-    const interventions = await Intervention.find().populate('clientId technicianId');
+// Router.get("/reports/export/csv", protect, admin, async (req, res) => {
+//   try {
+//     const interventions = await Intervention.find().populate('clientId technicianId');
 
-    const fields = ['title', 'description', 'status', 'clientId.name', 'technicianId.name', 'createdAt'];
-    const opts = { fields };
-    const parser = new Parser(opts);
-    const csv = parser.parse(interventions);
+//     const fields = ['title', 'description', 'status', 'clientId.name', 'technicianId.name', 'createdAt'];
+//     const opts = { fields };
+//     const parser = new Parser(opts);
+//     const csv = parser.parse(interventions);
 
-    res.header('Content-Type', 'text/csv');
-    res.attachment('interventions.csv');
-    res.send(csv);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
+//     res.header('Content-Type', 'text/csv');
+//     res.attachment('interventions.csv');
+//     res.send(csv);
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
 
 
 

@@ -25,8 +25,7 @@ const UserSchema = new mongoose.Schema({
     required: true
   },
   
-}, { timestamps: true },
- { discriminatorKey: 'role' });
+}, { timestamps: true ,discriminatorKey: 'role' });
 
 // Hash password before saving
 UserSchema.pre('save', async function(next) {

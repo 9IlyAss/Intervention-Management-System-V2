@@ -1,7 +1,6 @@
 const express = require('express');
 const Intervention = require('../models/Intervention');
 const ChatRoom = require('../models/ChatRoom');
-const Message = require('../models/Message');
 const Router = express.Router();
 const { protect } = require("../middleware/authMiddleware");
 
@@ -84,22 +83,24 @@ Router.post('/chat/:clientId', protect, async (req, res) => {
         });
 
         if (!chatRoom) {
-            chatRoom = new ChatRoom({ 
-                clientId: req.params.clientId, 
-                technicianId: req.user.id 
+            // If no chat room exists, create a new one
+            chatRoom = new ChatRoom({
+                clientId: req.params.clientId,
+                technicianId: req.user.id,
+                messages: [] // Initialize an empty messages array
             });
             await chatRoom.save();
         }
 
-        const newMessage = new Message({
-            chatRoomId: chatRoom._id,
+        // Push the new message to the chat room's messages
+        chatRoom.messages.push({
             senderId: req.user.id,
-            content: message.trim(),
+            content: message.trim()
         });
 
-        await newMessage.save();
+        await chatRoom.save();
         
-        res.status(201).json(newMessage);
+        res.status(201).json(chatRoom);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -112,6 +113,7 @@ Router.get('/chats', protect, async (req, res) => {
     try {
         const chatRooms = await ChatRoom.find({ technicianId: req.user.id })
             .populate('clientId', 'name email phone')
+            .populate('technicianId', 'name email phone') // Populate technicianId as well
             .sort({ updatedAt: -1 });
             
         res.json(chatRooms);
@@ -134,14 +136,7 @@ Router.get('/chats/:clientId/messages', protect, async (req, res) => {
             return res.status(404).json({ error: 'Chat room not found' });
         }
 
-        const messages = await Message.find({ chatRoomId: chatRoom._id })
-            .sort({ createdAt: 1 })
-            .limit(50);
-            
-        res.json({
-            chatRoom,
-            messages
-        });
+        res.json(chatRoom.messages); // Directly return the messages from chat room
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
