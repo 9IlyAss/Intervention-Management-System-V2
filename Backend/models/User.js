@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const UserSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: true
+    required: true,
   },
   email: {
     type: String,
@@ -24,11 +24,9 @@ const UserSchema = new mongoose.Schema({
     enum: ['client', 'technician', 'administrator'],
     required: true
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-}, { discriminatorKey: 'role' });
+  
+}, { timestamps: true },
+ { discriminatorKey: 'role' });
 
 // Hash password before saving
 UserSchema.pre('save', async function(next) {

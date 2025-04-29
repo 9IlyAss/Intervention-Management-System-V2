@@ -2,13 +2,13 @@ const express = require('express');
 const Intervention = require('../models/Intervention');
 const Feedback = require('../models/Feedback');
 const ChatRoom = require('../models/ChatRoom');
-const router = express.Router();
+const Router = express.Router();
 const { protect } = require("../middleware/authMiddleware");
 
 // @route POST /api/client/submit
 // @desc Submit a new intervention
 // @access Private (Client)
-router.post('/submit', protect, async (req, res) => {
+Router.post('/submit', protect, async (req, res) => {
     try {
         const { title, description, location, attachments } = req.body;
         
@@ -34,7 +34,7 @@ router.post('/submit', protect, async (req, res) => {
 // @route GET /api/client/interventions
 // @desc Get all interventions for a client
 // @access Private (Client)
-router.get('/interventions', protect, async (req, res) => {
+Router.get('/interventions', protect, async (req, res) => {
     try {
         const interventions = await Intervention.find({ clientId: req.user.id })
             .populate('technicianId', 'name email phone')
@@ -49,7 +49,7 @@ router.get('/interventions', protect, async (req, res) => {
 // @route GET /api/client/interventions/:id
 // @desc Get specific intervention details
 // @access Private (Client)
-router.get('/interventions/:id', protect, async (req, res) => {
+Router.get('/interventions/:id', protect, async (req, res) => {
     try {
         const intervention = await Intervention.findOne({
             _id: req.params.id,
@@ -69,7 +69,7 @@ router.get('/interventions/:id', protect, async (req, res) => {
 // @route POST /api/client/feedback/:interventionId
 // @desc Submit feedback for an intervention
 // @access Private (Client)
-router.post('/feedback/:interventionId', protect, async (req, res) => {
+Router.post('/feedback/:interventionId', protect, async (req, res) => {
     try {
         const { rating, comment } = req.body;
         
@@ -110,7 +110,7 @@ router.post('/feedback/:interventionId', protect, async (req, res) => {
 // @route POST /api/client/chat/:technicianId
 // @desc Send message to technician
 // @access Private (Client)
-router.post('/chat/:technicianId', protect, async (req, res) => {
+Router.post('/chat/:technicianId', protect, async (req, res) => {
     try {
         const { message } = req.body;
         
@@ -151,7 +151,7 @@ router.post('/chat/:technicianId', protect, async (req, res) => {
 // @route GET /api/client/chat/:technicianId
 // @desc Get chat history with technician
 // @access Private (Client)
-router.get('/chat/:technicianId', protect, async (req, res) => {
+Router.get('/chat/:technicianId', protect, async (req, res) => {
     try {
         const chatRoom = await ChatRoom.findOne({
             clientId: req.user.id,
@@ -172,4 +172,4 @@ router.get('/chat/:technicianId', protect, async (req, res) => {
     }
 });
 
-module.exports = router;
+module.exports = Router;

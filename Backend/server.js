@@ -5,6 +5,8 @@ const app = express();
 const ConnectDB = require("./config/db");
 const authRoutes =require("./Routes/authRoutes")
 const clientRoutes =require("./Routes/clientRoutes")
+const technicianRoutes=require("./Routes/technicianRoutes")
+const adminRoutes=require("./Routes/adminRoutes")
 
 
 app.use(express.json());
@@ -16,7 +18,8 @@ ConnectDB();
 
 app.use("/api/auth", authRoutes);
 app.use("/api/client", clientRoutes);
-
+app.use("/api/technician", technicianRoutes);
+app.use("/api/admin",adminRoutes)
 
 
 app.get("/", (req, res) => {

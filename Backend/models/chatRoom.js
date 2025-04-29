@@ -20,16 +20,22 @@ const MessageSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const ChatRoomSchema = new mongoose.Schema({
-  clientId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+  participants : {
+    clientId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    technicianId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
   },
-  technicianId: {
+  interventionId :  [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
+    ref: 'Intervention'
+  }],
   messages: [MessageSchema] // Embedded messages
 }, { timestamps: true });
 

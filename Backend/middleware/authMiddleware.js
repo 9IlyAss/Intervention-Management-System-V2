@@ -35,7 +35,13 @@ const admin= async (req,res,next)=>{
         res.status(401).json({
             message: "Not authorized, You're not admin"
         });
-
 }
-
-module.exports = {protect,admin} ;
+const AdTech = async (req,res,next)=>{
+    if(req.user&&(req.user.role === "administrator" || req.user.role === "technician"))
+        next()
+    else
+    res.status(401).json({
+        message: "Not authorized, You're not admin/technician"
+    });
+}
+module.exports = {protect,admin,AdTech} ;

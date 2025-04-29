@@ -1,192 +1,247 @@
-// routes/users.js
 const express = require('express');
-const router = express.Router();
-const auth = require('../middleware/auth');
-const User = require('../models/User');
-const Client = require('../models/Client');
-const Technician = require('../models/Technician');
-const Administrator = require('../models/Administrator');
+const Router = express.Router();
+const User = require('../models/User'); // Adjust path as needed
+const { protect, admin } = require('../middleware/auth'); // Adjust path as needed
+const Intervention = require('../models/Intervention'); // Intervention model
 
-// @route   GET api/users
-// @desc    Get all users (filtered by role if specified)
-// @access  Private (admin only)
-router.get('/', auth, async (req, res) => {
-  // Only administrators can list all users
-  if (req.user.role !== 'administrator') {
-    return res.status(403).json({ msg: 'Not authorized' });
-  }
 
+
+// @route POST /api/users
+// @desc Create user (client, technician, admin) based on role
+// @access Private (admin only) 
+Router.post("/", protect, admin, async (req, res) => {
   try {
-    const { role } = req.query;
-    let users;
+    const { name, email, phone, password, role, skillsList, permissionsList } = req.body;
 
-    if (role && ['client', 'technician', 'administrator'].includes(role)) {
-      // Filter by role if specified
-      users = await User.find({ role }).select('-password');
-    } else {
-      // Get all users
-      users = await User.find().select('-password');
+    // Check permissions based on requested role
+    if (role === "administrator" && !req.user.permissionsList.includes('full_access')) {
+      return res.status(401).json({
+        message: "Not authorized, creating administrators requires full_access permission"
+      });
+    } else if ((role === "client" || role === "technician") &&
+      !(req.user.permissionsList.includes('full_access') ||
+        req.user.permissionsList.includes('manage_users'))) {
+      return res.status(401).json({
+        message: "Not authorized, you need manage_users or full_access permission"
+      });
     }
 
-    res.json(users);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
+    // Check if user already exists
+    let user = await User.findOne({ email });
+    if (user) {
+      return res.status(400).json({ message: `User with this email already exists` });
+    }
+
+    // Create new user with appropriate fields
+    user = new User({
+      name,
+      email,
+      phone,
+      password,
+      role: role || "client"
+    });
+
+    // Add role-specific fields
+    if (role === "technician" && skillsList) {
+      user.skillsList = skillsList;
+    }
+
+    if (role === "administrator" && permissionsList) {
+      user.permissionsList = permissionsList;
+    }
+
+    await user.save();
+
+    // Return appropriate message based on role
+    res.status(201).json({
+      message: `${role || "User"} registered successfully!`,
+      user
+    });
+
+  } catch (error) {
+    console.error("Error creating user:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// @route   GET api/users/:id
-// @desc    Get user by ID
-// @access  Private (admin or self)
-router.get('/:id', auth, async (req, res) => {
+// @route PUT /api/users/:id
+// @desc Update user info by id
+// @access Private (admin only with appropriate permissions)
+Router.put("/:id", protect, admin, async (req, res) => {
   try {
-    // Check if user is requesting their own info or is an admin
-    if (req.user.id !== req.params.id && req.user.role !== 'administrator') {
-      return res.status(403).json({ msg: 'Not authorized' });
+    const { name, email, phone, role, skillsList, permissionsList } = req.body;
+
+    // Find user
+    let user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check permissions based on user role
+    if (user.role === "administrator" && !req.user.permissionsList.includes('full_access')) {
+      return res.status(401).json({
+        message: "Not authorized, modifying administrators requires full_access permission"
+      });
+    } else if ((user.role === "client" || user.role === "technician") &&
+      !(req.user.permissionsList.includes('full_access') ||
+        req.user.permissionsList.includes('manage_users'))) {
+      return res.status(401).json({
+        message: "Not authorized, you need manage_users or full_access permission"
+      });
+    }
+
+    // Update general fields
+    user.name = name || user.name;
+    user.email = email || user.email;
+    user.phone = phone || user.phone;
+    user.role = role || user.role;
+
+    // Update role-specific fields
+    if (user.role === "technician" && skillsList) {
+      user.skillsList = skillsList;
+    }
+
+    if (user.role === "administrator" && permissionsList) {
+      user.permissionsList = permissionsList;
+    }
+
+    const updatedUser = await user.save();
+
+    res.json({
+      message: `${user.role} updated successfully`,
+      user: updatedUser
+    });
+
+  } catch (error) {
+    console.error("Error updating user:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// @route GET /api/users
+// @desc Get all users
+// @access Private (admin only with appropriate permissions)
+Router.get("/", protect, admin, async (req, res) => {
+  try {
+    if (!(req.user.permissionsList.includes('full_access') ||
+      req.user.permissionsList.includes('manage_users') ||
+      req.user.permissionsList.includes('view_reports'))) {
+      return res.status(401).json({
+        message: "Not authorized, you need appropriate permissions to view users"
+      });
+    }
+
+    const users = await User.find({}).select('-password');
+    res.json(users);
+
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// @route GET /api/users/:id
+// @desc Get user by ID
+// @access Private (admin only with appropriate permissions)
+Router.get("/:id", protect, admin, async (req, res) => {
+  try {
+    if (!(req.user.permissionsList.includes('full_access') ||
+      req.user.permissionsList.includes('manage_users') ||
+      req.user.permissionsList.includes('view_reports'))) {
+      return res.status(401).json({
+        message: "Not authorized, you need appropriate permissions to view users"
+      });
     }
 
     const user = await User.findById(req.params.id).select('-password');
 
     if (!user) {
-      return res.status(404).json({ msg: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     res.json(user);
-  } catch (err) {
-    console.error(err.message);
-    if (err.kind === 'ObjectId') {
-      return res.status(404).json({ msg: 'User not found' });
-    }
-    res.status(500).send('Server error');
+
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// @route   PUT api/users/:id
-// @desc    Update user profile
-// @access  Private (admin or self)
-router.put('/:id', auth, async (req, res) => {
-  // Check if user is updating their own info or is an admin
-  if (req.user.id !== req.params.id && req.user.role !== 'administrator') {
-    return res.status(403).json({ msg: 'Not authorized' });
-  }
-
-  const { name, email, phone } = req.body;
-
-  // Build user object
-  const userFields = {};
-  if (name) userFields.name = name;
-  if (email) userFields.email = email;
-  if (phone) userFields.phone = phone;
-
+// @route DELETE /api/users/:id
+// @desc Delete user
+// @access Private (admin only with full_access permission)
+Router.delete("/:id", protect, admin, async (req, res) => {
   try {
-    let user = await User.findById(req.params.id);
+    if (!req.user.permissionsList.includes('full_access')) {
+      return res.status(401).json({
+        message: "Not authorized, deleting users requires full_access permission"
+      });
+    }
+
+    const user = await User.findById(req.params.id);
 
     if (!user) {
-      return res.status(404).json({ msg: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
-    // Update user
-    user = await User.findByIdAndUpdate(
-      req.params.id,
-      { $set: userFields },
-      { new: true }
-    ).select('-password');
+    await User.findByIdAndDelete(req.params.id);
 
-    res.json(user);
-  } catch (err) {
-    console.error(err.message);
-    if (err.kind === 'ObjectId') {
-      return res.status(404).json({ msg: 'User not found' });
-    }
-    res.status(500).send('Server error');
+    res.json({ message: "User deleted successfully" });
+
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// @route   PUT api/users/technician/:id/skills
-// @desc    Update technician skills
-// @access  Private (admin only)
-router.put('/technician/:id/skills', auth, async (req, res) => {
-  // Only administrators can update technician skills
-  if (req.user.role !== 'administrator') {
-    return res.status(403).json({ msg: 'Not authorized' });
-  }
 
-  const { skillsList } = req.body;
-
+// @route PUT /api/admin/assign-technician/:interventionId
+// @desc Assign a technician to an intervention
+// @access Private (Admin only)
+Router.put("/assign-technician/:interventionId", protect, admin, async (req, res) => {
+  const { technicianId } = req.body;
+  const { interventionId } = req.params;
   try {
-    let technician = await Technician.findById(req.params.id);
-
-    if (!technician) {
-      return res.status(404).json({ msg: 'Technician not found' });
+    if (!(req.user.permissionsList.includes('full_access') ||
+          req.user.permissionsList.includes('assign_technician'))) {
+      return res.status(401).json({
+        message: "Not authorized, you need appropriate permissions to assign a technician"
+      });
     }
-
-    // Update technician skills
-    technician = await Technician.findByIdAndUpdate(
-      req.params.id,
-      { $set: { skillsList } },
-      { new: true }
-    ).select('-password');
-
-    res.json(technician);
-  } catch (err) {
-    console.error(err.message);
-    if (err.kind === 'ObjectId') {
-      return res.status(404).json({ msg: 'Technician not found' });
+    const intervention = await Intervention.findById(interventionId);
+    if (!intervention) {
+      return res.status(404).json({ message: "Intervention not found" });
     }
-    res.status(500).send('Server error');
+    intervention.technicianId = technicianId;
+    intervention.status = 'In Progress';
+    await intervention.save();
+
+    // Create Chat Session
+    const chat = new Chat({
+      participants: [intervention.clientId, technicianId],
+      intervention: interventionId
+    });
+    await chat.save();
+    res.json({ message: "Technician assigned and chat created successfully", intervention, chat });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// @route   PUT api/users/admin/:id/permissions
-// @desc    Update administrator permissions
-// @access  Private (admin only)
-router.put('/admin/:id/permissions', auth, async (req, res) => {
-  // Only administrators can update permissions
-  if (req.user.role !== 'administrator') {
-    return res.status(403).json({ msg: 'Not authorized' });
-  }
 
-  const { permissionsList } = req.body;
 
-  // Validate permissions
-  const validPermissions = ['assign_technician', 'manage_users', 'view_reports'];
-  if (permissionsList.some(perm => !validPermissions.includes(perm))) {
-    return res.status(400).json({ msg: 'Invalid permissions' });
-  }
 
-  try {
-    let admin = await Administrator.findById(req.params.id);
 
-    if (!admin) {
-      return res.status(404).json({ msg: 'Administrator not found' });
-    }
-
-    // Update administrator permissions
-    admin = await Administrator.findByIdAndUpdate(
-      req.params.id,
-      { $set: { permissionsList } },
-      { new: true }
-    ).select('-password');
-
-    res.json(admin);
-  } catch (err) {
-    console.error(err.message);
-    if (err.kind === 'ObjectId') {
-      return res.status(404).json({ msg: 'Administrator not found' });
-    }
-    res.status(500).send('Server error');
-  }
-});
-
+// ************************************************
 // @route   GET api/users/technicians/available
 // @desc    Get available technicians for intervention assignment
 // @access  Private (admin only)
-router.get('/technicians/available', auth, async (req, res) => {
+Router.get('/technicians/available', auth, async (req, res) => {
   // Only administrators can access this endpoint
   if (req.user.role !== 'administrator') {
     return res.status(403).json({ msg: 'Not authorized' });
   }
-
   try {
     // Get all technicians with their skills
     const technicians = await Technician.find().select('name email phone skillsList');
@@ -197,37 +252,5 @@ router.get('/technicians/available', auth, async (req, res) => {
   }
 });
 
-// @route   DELETE api/users/:id
-// @desc    Delete a user
-// @access  Private (admin only)
-router.delete('/:id', auth, async (req, res) => {
-  // Only administrators can delete users
-  if (req.user.role !== 'administrator') {
-    return res.status(403).json({ msg: 'Not authorized' });
-  }
 
-  try {
-    const user = await User.findById(req.params.id);
-
-    if (!user) {
-      return res.status(404).json({ msg: 'User not found' });
-    }
-
-    // Don't let admin delete themselves
-    if (req.user.id === req.params.id) {
-      return res.status(400).json({ msg: 'Cannot delete your own account' });
-    }
-
-    await User.findByIdAndRemove(req.params.id);
-
-    res.json({ msg: 'User removed' });
-  } catch (err) {
-    console.error(err.message);
-    if (err.kind === 'ObjectId') {
-      return res.status(404).json({ msg: 'User not found' });
-    }
-    res.status(500).send('Server error');
-  }
-});
-
-module.exports = router;
+module.exports = Router;

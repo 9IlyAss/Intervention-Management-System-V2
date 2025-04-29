@@ -17,7 +17,7 @@ const InterventionSchema = new mongoose.Schema({
   technicianId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
-  },
+  }, 
   location: {
     type: String,
     trim: true // Removes extra whitespace
@@ -27,18 +27,11 @@ const InterventionSchema = new mongoose.Schema({
     enum: ['Pending', 'In Progress', 'Completed', 'Cancelled'],
     default: 'Pending'
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  },
+
   attachmentsList: [{
     type: String
   }]
-});
+}, { timestamps: true });
 
 // Update the updatedAt field on save
 InterventionSchema.pre('save', function(next) {
