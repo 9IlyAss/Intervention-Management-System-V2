@@ -3,9 +3,11 @@ const Router = express.Router();
 const User = require('../models/User'); // Adjust path as needed
 const { protect, admin } = require('../middleware/authMiddleware'); // Adjust path as needed
 const Intervention = require('../models/Intervention'); // Intervention model
-const Feedback =require("../models/Feedback")
+const Feedback = require("../models/Feedback")
 const ChatRoom = require("../models/ChatRoom");
 const Client = require('../models/Client');
+const Technician = require("../models/Technician");
+const Administrator = require("../models/Administrator")
 
 // @route POST /api/admin
 // @desc Create user (client, technician, admin) based on role
@@ -69,9 +71,6 @@ Router.post("/", protect, admin, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
-
-
 
 
 // @route GET /api/admin
@@ -138,8 +137,9 @@ Router.delete("/:id", protect, admin, async (req, res) => {
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    } else if (user.permissionsList && user.permissionsList.includes('full_access')) {
+      return res.status(401).json({ message: "you cant delete a user with full_access permission" });
     }
-
     await User.findByIdAndDelete(req.params.id);
 
     res.json({ message: "User deleted successfully" });
@@ -160,7 +160,7 @@ Router.put("/assign-technician/:interventionId", protect, admin, async (req, res
 
   try {
     if (!(req.user.permissionsList.includes('full_access') ||
-          req.user.permissionsList.includes('assign_technician'))) {
+      req.user.permissionsList.includes('assign_technician'))) {
       return res.status(401).json({
         message: "Not authorized, you need appropriate permissions to assign a technician"
       });
@@ -195,10 +195,10 @@ Router.put("/assign-technician/:interventionId", protect, admin, async (req, res
       await existingChat.save();
     }
 
-    res.json({ 
-      message: "Technician assigned and chat ready!", 
-      intervention, 
-      chatRoomId: existingChat._id 
+    res.json({
+      message: "Technician assigned and chat ready!",
+      intervention,
+      chatRoomId: existingChat._id
     });
 
   } catch (error) {
@@ -207,92 +207,171 @@ Router.put("/assign-technician/:interventionId", protect, admin, async (req, res
   }
 });
 
+
+//& ********************heere 
 // @route PUT /api/admin/:id
 // @desc Update user info by id
 // @access Private (admin only with appropriate permissions)
 Router.put("/:id", protect, admin, async (req, res) => {
   try {
-    const { name, email, phone, role, skillsList, permissionsList } = req.body;
-
+    const { name, email, phone, skillsList, permissionsList } = req.body;
+    
+    // Find user using base model
     let user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Rehydrate correct model
+    // Authorization checks
+    if (user.role === "administrator" && 
+        !req.user.permissionsList.includes('full_access')) {
+      return res.status(403).json({
+        message: "Requires full_access to modify administrators"
+      });
+    }
+
+    if ((user.role === "client" || user.role === "technician") &&
+        !req.user.permissionsList.includes('manage_users') &&
+        !req.user.permissionsList.includes('full_access')) {
+      return res.status(403).json({
+        message: "Requires manage_users or full_access permission"
+      });
+    }
+
+    // Update common fields
+    if (name) user.name = name;
+    if (email) {
+      const emailExists = await User.findOne({ email });
+      if (emailExists && emailExists._id.toString() !== user._id.toString()) {
+        return res.status(400).json({ message: "Email already in use" });
+      }
+      user.email = email;
+    }
+    if (phone) user.phone = phone;
+
+    // Handle role-specific updates
     if (user.role === "technician") {
-      user = await Technician.findById(req.params.id);
+      if (skillsList) {
+        user.skillsList = skillsList;
+      }
     } else if (user.role === "administrator") {
-      user = await Administrator.findById(req.params.id);
+      if (permissionsList) {
+        user.permissionsList = permissionsList.filter(p => 
+          ['full_access','assign_technician','manage_users','view_reports'].includes(p)
+        );
+      }
     }
-
-    // Permission check
-    if (user.role === "administrator" && !req.user.permissionsList.includes('full_access')) {
-      return res.status(401).json({
-        message: "Not authorized, modifying administrators requires full_access permission"
-      });
-    } else if ((user.role === "client" || user.role === "technician") &&
-      !(req.user.permissionsList.includes('full_access') || req.user.permissionsList.includes('manage_users'))) {
-      return res.status(401).json({
-        message: "Not authorized, you need manage_users or full_access permission"
-      });
-    }
-
-    // Update general fields
-    user.name = name || user.name;
-    user.email = email || user.email;
-    user.phone = phone || user.phone;
-    user.role = role || user.role;
-
-    // Update role-specific fields
-    if (user.role === "technician" && skillsList) {
-      user.skillsList = skillsList;
-    }
-
-    if (user.role === "administrator" && permissionsList) {
-      user.permissionsList = permissionsList;
-    }
-
     const updatedUser = await user.save();
-
+    
     res.json({
-      message: `${user.role} updated successfully`,
-      user: updatedUser
+      message: "User updated successfully",
+      user: {
+        _id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        role: updatedUser.role,
+        ...(updatedUser.role === 'technician' && { skillsList: updatedUser.skillsList }),
+        ...(updatedUser.role === 'administrator' && { permissionsList: updatedUser.permissionsList })
+      }
     });
 
   } catch (error) {
-    console.error("Error updating user:", error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Update error:", error);
+    res.status(500).json({ 
+      message: "Server error",
+      error: error.message
+    });
   }
 });
+
+
+//*old code
+// Router.put("/:id", protect, admin, async (req, res) => {
+//   try {
+//     const { name, email, phone, skillsList, permissionsList } = req.body;
+
+//     let user = await User.findById(req.params.id);
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     if (user.role === "administrator" && !req.user.permissionsList.includes('full_access')) {
+//       return res.status(401).json({
+//         message: "Not authorized, modifying administrators requires full_access permission"
+//       });
+//     } else if ((user.role === "client" || user.role === "technician") &&
+//       !(req.user.permissionsList.includes('full_access') || req.user.permissionsList.includes('manage_users'))) {
+//       return res.status(401).json({
+//         message: "Not authorized, you need manage_users or full_access permission"
+//       });
+//     }
+//     if(user.role === "technician"&& skillsList ){
+//       const updateuser=new Technician({
+//         name : name || user.name,
+//         email : email || user.email,
+//         phone : phone || user.phone,
+//         skillsList : skillsList
+//       })
+//     }else if (user.role === "administrator" && permissionsList) {
+//       const updateuser=new Administrator({
+//         name : name || user.name,
+//         email : email || user.email,
+//         phone : phone || user.phone,
+//         permissionsList :permissionsList
+//       })
+//     }else {
+//       const updateuser=new Client({
+//         name : name || user.name,
+//         email : email || user.email,
+//         phone : phone || user.phone,
+//       })
+//     }
+//      await updatedUser.save();
+
+//     res.json({
+//       message: ` updated successfully`,
+//       user: updatedUser
+//     });
+
+//   } catch (error) {
+//     console.error("Error updating user:", error);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
+//* end
+
+
+
 
 
 // @route Get /api/admin/feedback
 // @desc Get all feedbacks
 // @access Private (admin)
-Router.post('/feedback', protect,admin, async (req, res) => {
+
+Router.post('/feedback', protect, admin, async (req, res) => {
   try {
-      const feedbacks=Feedback.find({},{rating : 1 ,_id:0}).populate('clientId', 'name')
-      if(feedbacks)
-        res.json(users);
-      else 
-        return res.status(404).json({ msg: 'No feedback Found ' });
+    const feedbacks = Feedback.find({}, { rating: 1, _id: 0 }).populate('clientId', 'name')
+    if (feedbacks)
+      res.json(users);
+    else
+      return res.status(404).json({ msg: 'No feedback Found ' });
   } catch (error) {
-      res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
-// // *********************Futures i will add***************************
-// // @route   GET api/users/technicians/available
-// // @desc    Get available technicians for intervention assignment
-// // @access  Private (admin only)
+// *********************Futures i will add***************************
+// @route   GET api/users/technicians/available
+// @desc    Get available technicians for intervention assignment
+// @access  Private (admin only)
 // Router.get('/technicians/available', auth, async (req, res) => {
-//   // Only administrators can access this endpoint
+// Only administrators can access this endpoint
 //   if (req.user.role !== 'administrator') {
 //     return res.status(403).json({ msg: 'Not authorized' });
 //   }
 //   try {
-//     // Get all technicians with their skills
+//      Get all technicians with their skills
 //     const technicians = await Technician.find().select('name email phone skillsList');
 //     res.json(technicians);
 //   } catch (err) {

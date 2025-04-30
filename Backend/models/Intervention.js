@@ -28,9 +28,8 @@ const InterventionSchema = new mongoose.Schema({
     default: 'Pending'
   },
 
-  attachmentsList: [{
-    type: String
-  }]
+  attachmentsList: [String]
+
 }, { timestamps: true });
 
 // Update the updatedAt field on save

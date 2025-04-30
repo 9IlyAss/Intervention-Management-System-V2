@@ -22,7 +22,7 @@ Router.post('/submit', protect, async (req, res) => {
             clientId: req.user.id,
             status: 'Pending',
             location,
-            attachments: attachments || [],
+            attachmentsList : attachments || [],
         });
 
         await newIntervention.save();
@@ -37,8 +37,7 @@ Router.post('/submit', protect, async (req, res) => {
 // @access Private (Client)
 Router.get('/interventions', protect, async (req, res) => {
     try {
-        const interventions = await Intervention.find({ clientId: req.user.id })
-            .populate('technicianId', 'name email phone')
+        const interventions = await Intervention.find({ clientId: req.user.id },{title : 1 ,status : 1,_id:0 })
             .sort({ createdAt: -1 });
             
         res.json(interventions);
@@ -60,7 +59,6 @@ Router.get('/interventions/:id', protect, async (req, res) => {
         if (!intervention) {
             return res.status(404).json({ error: 'Intervention not found' });
         }
-        
         res.json(intervention);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -108,6 +106,8 @@ Router.post('/feedback/:interventionId', protect, async (req, res) => {
     }
 });
 
+
+//& Test chat
 // @route POST /api/client/chat/:technicianId
 // @desc Send message to technician
 // @access Private (Client)
