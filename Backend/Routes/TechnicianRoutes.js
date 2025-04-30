@@ -78,21 +78,13 @@ Router.post('/chat/:clientId', protect, async (req, res) => {
         }
 
         let chatRoom = await ChatRoom.findOne({
-            clientId: req.params.clientId,
-            technicianId: req.user.id
+            'participants.clientId': req.params.clientId,
+            'participants.technicianId': req.user.id
         });
 
-        if (!chatRoom) {
-            // If no chat room exists, create a new one
-            chatRoom = new ChatRoom({
-                clientId: req.params.clientId,
-                technicianId: req.user.id,
-                messages: [] // Initialize an empty messages array
-            });
-            await chatRoom.save();
-        }
+        if (!chatRoom) 
+            return res.status(400).json({ error: 'No chatRoom founded' });
 
-        // Push the new message to the chat room's messages
         chatRoom.messages.push({
             senderId: req.user.id,
             content: message.trim()
@@ -100,46 +92,63 @@ Router.post('/chat/:clientId', protect, async (req, res) => {
 
         await chatRoom.save();
         
-        res.status(201).json(chatRoom);
+        res.status(201).json({message : "Message send !"});
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// @route GET /api/technician/chats
-// @desc Get all chat rooms for technician
+// @route GET /api/technician/chat/:clientId
+// @desc Get chat history with specific client
 // @access Private (Technician)
-Router.get('/chats', protect, async (req, res) => {
-    try {
-        const chatRooms = await ChatRoom.find({ technicianId: req.user.id })
-            .populate('clientId', 'name email phone')
-            .populate('technicianId', 'name email phone') // Populate technicianId as well
-            .sort({ updatedAt: -1 });
-            
-        res.json(chatRooms);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// @route GET /api/technician/chats/:clientId/messages
-// @desc Get chat history with specific client (renamed endpoint)
-// @access Private (Technician)
-Router.get('/chats/:clientId/messages', protect, async (req, res) => {
+Router.get('/chat/:clientId', protect, async (req, res) => {
     try {
         const chatRoom = await ChatRoom.findOne({
-            clientId: req.params.clientId,
-            technicianId: req.user.id
-        }).populate('clientId', 'name email phone');
-
+            'participants.clientId': req.params.clientId,
+            'participants.technicianId': req.user.id
+        })
+        .populate('participants.clientId', 'name')        // nom client
+        .populate('messages.senderId', 'name');           // nom expéditeur
         if (!chatRoom) {
             return res.status(404).json({ error: 'Chat room not found' });
         }
+        const messages = chatRoom.messages.map(msg => ({
+            senderName: msg.senderId.name,
+            content: msg.content,
+            sentAt: msg.createdAt
+        }));
+        res.status(200).json({
+            clientName: chatRoom.participants.clientId.name,
+            messages
+        });
 
-        res.json(chatRoom.messages); // Directly return the messages from chat room
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
+
+// @route GET /api/technician/chat
+// @desc Get simplified list of chat rooms for technician
+// @access Private (Technician)
+Router.get('/chat', protect, async (req, res) => {
+    try {
+        const chatRooms = await ChatRoom.find({ 'participants.technicianId': req.user.id })
+            .populate('participants.clientId', 'name')
+            .populate('interventionId', 'title')
+            .sort({ updatedAt: -1 });
+
+        // On extrait uniquement les infos nécessaires
+        const simplified = chatRooms.map(chat => ({
+            chatRoomId: chat._id,
+            clientName: chat.participants.clientId.name,
+            interventionTitle: chat.interventionId.title
+        }));
+
+        res.json(simplified);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
 module.exports = Router;
