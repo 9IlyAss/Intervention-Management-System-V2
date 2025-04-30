@@ -124,19 +124,9 @@ Router.post('/chat/:technicianId', protect, async (req, res) => {
             'participants.technicianId': req.params.technicianId
         });
 
-        if (!chatRoom) {
-            // Create a new chat room if it doesn't exist
-            chatRoom = new ChatRoom({
-                participants: {
-                    clientId: req.user.id,
-                    technicianId: req.params.technicianId
-                },
-                messages: [] // Initialize an empty message array
-            });
-            await chatRoom.save();
-        }
+        if (!chatRoom) 
+            return res.status(400).json({ error: 'No chatRoom founded' });
 
-        // Add the new message to the chat room's message array
         chatRoom.messages.push({
             senderId: req.user.id,
             content: message.trim()
@@ -144,31 +134,64 @@ Router.post('/chat/:technicianId', protect, async (req, res) => {
 
         await chatRoom.save();
         
-        // Optional: Emit real-time event if using Socket.io
-        // io.to(chatRoom._id).emit('newMessage', newMessage);
-        
-        res.status(201).json(chatRoom);
+        res.status(201).json({message : "Message send !"});
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
+
 // @route GET /api/client/chat/:technicianId
-// @desc Get chat history with technician
+// @desc Get full conversation for client with a technician
 // @access Private (Client)
 Router.get('/chat/:technicianId', protect, async (req, res) => {
     try {
         const chatRoom = await ChatRoom.findOne({
             'participants.clientId': req.user.id,
             'participants.technicianId': req.params.technicianId
-        }).populate('participants.clientId', 'name email phone')
-          .populate('participants.technicianId', 'name email phone');
+        })
+        .populate('participants.technicianId', 'name')        // nom du technicien
+        .populate('messages.senderId', 'name');               // nom de l'expéditeur
 
         if (!chatRoom) {
-            return res.json([]); // Return an empty array if no chat exists
+            return res.status(404).json({ error: 'Chat room not found' });
         }
 
-        res.json(chatRoom.messages); // Return the messages directly from the chat room
+        const messages = chatRoom.messages.map(msg => ({
+            senderName: msg.senderId.name,
+            content: msg.content,
+            sentAt: msg.createdAt
+        }));
+
+        res.status(200).json({
+            technicianName: chatRoom.participants.technicianId.name,
+            messages
+        });
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+// @route GET /api/client/chat
+// @desc Get simplified list of chat rooms for client
+// @access Private (client)
+Router.get('/chat', protect, async (req, res) => {
+    try {
+        const chatRooms = await ChatRoom.find({ 'participants.clientId': req.user.id })
+            .populate('participants.technicianId', 'name')
+            .populate('interventionId', 'title')
+            .sort({ updatedAt: -1 });
+
+        // On extrait uniquement les infos nécessaires
+        const simplified = chatRooms.map(chat => ({
+            chatRoomId: chat._id,
+            clientName: chat.participants.technicianId.name,
+            interventionTitle: chat.interventionId.title
+        }));
+
+        res.json(simplified);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
