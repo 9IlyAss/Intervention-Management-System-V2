@@ -1,5 +1,5 @@
 // app/(app)/(client)/conversation/[id].jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,175 +11,215 @@ import {
   Platform,
   StatusBar,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useLocalSearchParams, router } from 'expo-router';
+import clientService from '../../../services/clientService';
 
 export default function ConversationScreen() {
   const { user } = useAuth();
-  const { id } = useLocalSearchParams();
+  // Use chatRoomId instead of id for clarity
+  const { id: chatRoomId, technicianName } = useLocalSearchParams();
   const [isLoading, setIsLoading] = useState(true);
-  const [chatInfo, setChatInfo] = useState(null);
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState(null);
+  const [chatInfo, setChatInfo] = useState({
+    id: chatRoomId,
+    name: technicianName || 'Technician',
+    avatar: null,
+    isOnline: false,
+  });
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
+  const flatListRef = useRef(null);
 
+  // Generate a unique ID for messages
+  const generateMessageId = () => {
+    return `msg-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+  };
+
+  // Load chat messages on component mount
   useEffect(() => {
-    // Simulate API call to get chat info and messages
-    setTimeout(() => {
-      // This would be replaced with a real API call in production
-      if (id === '1') { // Support Team
+    fetchChatMessages();
+  }, [chatRoomId]);
+
+  // Function to fetch chat messages using room ID
+  const fetchChatMessages = async () => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      
+      if (!chatRoomId) {
+        throw new Error('Chat room ID is required');
+      }
+      
+      console.log(`Fetching chat for room ID: ${chatRoomId}`);
+      
+      // Use the new method that gets chat by room ID
+      const chatData = await clientService.getChatByRoomId(chatRoomId);
+      
+      // Check if we have chat data
+      if (!chatData || !chatData.messages) {
         setChatInfo({
-          id: '1',
-          name: 'Support Team',
-          avatar: null,
-          isOnline: true,
-        });
-        setMessages([
-          {
-            id: '1',
-            text: 'Hello! How can I help you today?',
-            sender: 'tech',
-            senderName: 'Support Team',
-            timestamp: new Date(Date.now() - 60000 * 25),
-          },
-          {
-            id: '2',
-            text: 'I have a question about my AC maintenance appointment.',
-            sender: 'client',
-            senderName: 'You',
-            timestamp: new Date(Date.now() - 60000 * 20),
-          },
-          {
-            id: '3',
-            text: 'Of course! I can see you have an appointment scheduled for next week. What would you like to know?',
-            sender: 'tech',
-            senderName: 'Support Team',
-            timestamp: new Date(Date.now() - 60000 * 15),
-          },
-        ]);
-      } else if (id === '2') { // John Smith
-        setChatInfo({
-          id: '2',
-          name: 'John Smith',
+          id: chatRoomId,
+          name: technicianName || 'Technician',
           avatar: null,
           isOnline: false,
-          lastSeen: new Date(Date.now() - 60000 * 45),
         });
-        setMessages([
-          {
-            id: '1',
-            text: 'Hello, I m scheduled to perform AC maintenance at your location.',
-            sender: 'tech',
-            senderName: 'John Smith',
-            timestamp: new Date(Date.now() - 3600000 * 5),
-          },
-          {
-            id: '2',
-            text: 'Hi John, what time should I expect you?',
-            sender: 'client',
-            senderName: 'You',
-            timestamp: new Date(Date.now() - 3600000 * 4),
-          },
-          {
-            id: '3',
-            text: 'I ll be there at 10 AM for the AC maintenance.',
-            sender: 'tech',
-            senderName: 'John Smith',
-            timestamp: new Date(Date.now() - 3600000 * 2),
-          },
-        ]);
-      } else { // Sarah Johnson or fallback
+        setMessages([]);
+      } else {
+        // Update chat info
         setChatInfo({
-          id: '3',
-          name: 'Sarah Johnson',
+          id: chatRoomId,
+          name: chatData.technicianName || technicianName || 'Technician',
           avatar: null,
-          isOnline: true,
+          isOnline: true, // This would come from the API in a real app
         });
-        setMessages([
-          {
-            id: '1',
-            text: 'Hi, I ll be handling your network setup today.',
-            sender: 'tech',
-            senderName: 'Sarah Johnson',
-            timestamp: new Date(Date.now() - 86400000 * 2),
-          },
-          {
-            id: '2',
-            text: 'Great! What time will you arrive?',
-            sender: 'client',
-            senderName: 'You',
-            timestamp: new Date(Date.now() - 86400000 * 2 + 3600000),
-          },
-          {
-            id: '3',
-            text: 'I should be there around 2:30 PM. I ll let you know if anything changes.',
-            sender: 'tech',
-            senderName: 'Sarah Johnson',
-            timestamp: new Date(Date.now() - 86400000 * 2 + 3600000 * 2),
-          },
-          {
-            id: '4',
-            text: 'The network setup has been completed successfully.',
-            sender: 'tech',
-            senderName: 'Sarah Johnson',
-            timestamp: new Date(Date.now() - 86400000 * 1),
-          },
-        ]);
+        
+        // Format messages for display with unique IDs
+        const formattedMessages = chatData.messages.map((msg, index) => ({
+          id: `msg-${index}-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+          text: msg.content,
+          // Check all possible conditions for identifying client messages
+          sender: msg.senderName === user?.name || 
+                  msg.senderName === 'You' || 
+                  msg.senderId === user?.id ? 'client' : 'tech',
+          senderName: msg.senderName,
+          timestamp: new Date(msg.sentAt || Date.now()),
+        }));
+        
+        setMessages(formattedMessages);
       }
+    } catch (err) {
+      console.error('Failed to load chat messages:', err);
+      
+      // Provide more specific error messages based on error code
+      if (err.response) {
+        if (err.response.status === 404) {
+          setError('Chat room not found or you are not authorized to access it.');
+        } else if (err.response.status === 400) {
+          setError('Invalid chat room ID format. Please go back and try again.');
+        } else {
+          setError(`Server error: ${err.response.data?.error || 'Unknown error'}`);
+        }
+      } else {
+        setError('Failed to load chat messages. Please check your connection and try again.');
+      }
+    } finally {
       setIsLoading(false);
-    }, 1000);
-  }, [id]);
+    }
+  };
 
-  const sendMessage = () => {
+  // Function to send a message
+  const sendMessage = async () => {
     if (message.trim() === '') return;
-
+    
+    // Store the message text and clear input for better UX
+    const messageText = message.trim();
+    setMessage('');
+    
+    // Add message to the UI immediately (optimistic update)
     const newMessage = {
-      id: Date.now().toString(),
-      text: message,
+      id: generateMessageId(),
+      text: messageText,
       sender: 'client',
       senderName: 'You',
       timestamp: new Date(),
+      pending: true, // Mark as pending until confirmed by server
     };
-
-    setMessages([...messages, newMessage]);
-    setMessage('');
-
-    // Simulate response after 1 second
+    
+    setMessages(prevMessages => [...prevMessages, newMessage]);
+    
+    // Scroll to the bottom
     setTimeout(() => {
-      const responseMessage = {
-        id: (Date.now() + 1).toString(),
-        text: "Thanks for your message! I'll get back to you shortly.",
-        sender: 'tech',
-        senderName: chatInfo?.name || 'Technician',
-        timestamp: new Date(),
-      };
-      setMessages(currentMessages => [...currentMessages, responseMessage]);
-    }, 1000);
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+    
+    try {
+      setIsSending(true);
+      
+      // Send message to server using chat room ID
+      await clientService.sendMessageToChatRoom(chatRoomId, messageText);
+      
+      // Update the message status (remove pending flag)
+      setMessages(prevMessages => 
+        prevMessages.map(msg => 
+          msg.id === newMessage.id ? { ...msg, pending: false } : msg
+        )
+      );
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      
+      // Show error but keep the message in the UI
+      Alert.alert(
+        'Message Not Sent',
+        'Failed to send your message. Tap to try again.',
+        [{ text: 'OK' }]
+      );
+      
+      // Mark the message as failed
+      setMessages(prevMessages => 
+        prevMessages.map(msg => 
+          msg.id === newMessage.id ? { ...msg, pending: false, failed: true } : msg
+        )
+      );
+    } finally {
+      setIsSending(false);
+    }
   };
 
+  // Function to retry sending a failed message
+  const retryMessage = async (failedMessage) => {
+    // Remove the failed message
+    setMessages(prevMessages => 
+      prevMessages.filter(msg => msg.id !== failedMessage.id)
+    );
+    
+    // Set the message text and trigger send
+    setMessage(failedMessage.text);
+    setTimeout(() => sendMessage(), 100);
+  };
+
+  // Render each message
   const renderMessage = ({ item }) => {
     const isClient = item.sender === 'client';
     return (
-      <View style={[styles.messageContainer, isClient ? styles.clientMessage : styles.techMessage]}>
-        <View style={[styles.messageBubble, isClient ? styles.clientBubble : styles.techBubble]}>
+      <TouchableOpacity
+        style={[styles.messageContainer, isClient ? styles.clientMessage : styles.techMessage]}
+        disabled={!item.failed}
+        onPress={() => item.failed && retryMessage(item)}
+      >
+        <View style={[
+          styles.messageBubble, 
+          isClient ? styles.clientBubble : styles.techBubble,
+          item.pending && styles.pendingBubble,
+          item.failed && styles.failedBubble
+        ]}>
           <Text style={[styles.messageText, isClient ? styles.clientText : styles.techText]}>
             {item.text}
           </Text>
         </View>
-        <Text style={styles.timestamp}>
-          {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </Text>
-      </View>
+        <View style={styles.timestampContainer}>
+          {item.pending && <Ionicons name="time" size={12} color="#999" style={styles.statusIcon} />}
+          {item.failed && <Ionicons name="alert-circle" size={12} color="#F44336" style={styles.statusIcon} />}
+          <Text style={styles.timestamp}>
+            {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+        </View>
+      </TouchableOpacity>
     );
   };
 
+  // Show loading screen
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer} edges={['top']}>
         <StatusBar barStyle="dark-content" />
         <ActivityIndicator size="large" color="#6200EE" />
+        <Text style={styles.loadingText}>Loading conversation...</Text>
       </SafeAreaView>
     );
   }
@@ -199,12 +239,31 @@ export default function ConversationScreen() {
             <Text style={styles.onlineStatus}>Online</Text>
           ) : (
             <Text style={styles.offlineStatus}>
-              Last seen {chatInfo?.lastSeen?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              Offline
             </Text>
           )}
         </View>
         
-        <TouchableOpacity style={styles.headerButton}>
+        <TouchableOpacity 
+          style={styles.headerButton}
+          onPress={() => {
+            // Show options like refresh, clear chat, etc.
+            Alert.alert(
+              'Chat Options',
+              'What would you like to do?',
+              [
+                { 
+                  text: 'Refresh Messages', 
+                  onPress: fetchChatMessages 
+                },
+                { 
+                  text: 'Cancel', 
+                  style: 'cancel' 
+                }
+              ]
+            )
+          }}
+        >
           <Ionicons name="ellipsis-vertical" size={24} color="#333" />
         </TouchableOpacity>
       </View>
@@ -214,16 +273,49 @@ export default function ConversationScreen() {
         style={styles.content}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <FlatList
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.messagesList}
-          inverted={false}
-        />
+        {error ? (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={64} color="#F44336" />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity 
+              style={styles.retryButton} 
+              onPress={fetchChatMessages}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          messages.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="chatbubble-ellipses-outline" size={64} color="#CCCCCC" />
+              <Text style={styles.emptyText}>No messages yet</Text>
+              <Text style={styles.emptySubText}>Send a message to start the conversation</Text>
+            </View>
+          ) : (
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              renderItem={renderMessage}
+              keyExtractor={item => String(item.id)} // Ensure key is always a string
+              contentContainerStyle={styles.messagesList}
+              showsVerticalScrollIndicator={true}
+              onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+              onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+            />
+          )
+        )}
         
         <View style={styles.inputContainer}>
-          <TouchableOpacity style={styles.attachButton}>
+          <TouchableOpacity 
+            style={styles.attachButton}
+            onPress={() => {
+              Alert.alert(
+                'Attachment Options',
+                'This feature is coming soon!',
+                [{ text: 'OK' }]
+              );
+            }}
+          >
             <Ionicons name="add-circle-outline" size={24} color="#6200EE" />
           </TouchableOpacity>
           
@@ -233,18 +325,23 @@ export default function ConversationScreen() {
             value={message}
             onChangeText={setMessage}
             multiline
+            maxLength={500}
           />
           
           <TouchableOpacity 
-            style={styles.sendButton}
+            style={[styles.sendButton, (message.trim() === '' || isSending) && styles.disabledButton]}
             onPress={sendMessage}
-            disabled={message.trim() === ''}
+            disabled={message.trim() === '' || isSending}
           >
-            <Ionicons 
-              name="send" 
-              size={24} 
-              color={message.trim() === '' ? '#CCCCCC' : '#6200EE'} 
-            />
+            {isSending ? (
+              <ActivityIndicator size="small" color="#CCCCCC" />
+            ) : (
+              <Ionicons 
+                name="send" 
+                size={24} 
+                color={message.trim() === '' ? '#CCCCCC' : '#6200EE'} 
+              />
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -262,6 +359,53 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F5F7FA',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    marginTop: 16,
+    marginBottom: 24,
+    fontSize: 16,
+    color: '#F44336',
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#6200EE',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 18,
+    color: '#666',
+    fontWeight: '500',
+  },
+  emptySubText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
   },
   header: {
     flexDirection: 'row',
@@ -335,6 +479,14 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
+  pendingBubble: {
+    opacity: 0.7,
+  },
+  failedBubble: {
+    backgroundColor: '#FFEBEE',
+    borderWidth: 1,
+    borderColor: '#FFCDD2',
+  },
   messageText: {
     fontSize: 16,
   },
@@ -344,11 +496,18 @@ const styles = StyleSheet.create({
   techText: {
     color: '#333333',
   },
+  timestampContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    marginHorizontal: 4,
+  },
+  statusIcon: {
+    marginRight: 4,
+  },
   timestamp: {
     fontSize: 12,
     color: '#999999',
-    marginTop: 4,
-    marginHorizontal: 4,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -382,5 +541,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
 });

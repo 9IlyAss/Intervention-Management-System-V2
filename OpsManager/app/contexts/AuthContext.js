@@ -1,7 +1,7 @@
 // app/contexts/AuthContext.js
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authAPI, userAPI } from '../services/api';
+import authService from '../services/authService'; // Import the default export properly
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
 
@@ -18,6 +18,18 @@ export const AuthProvider = ({ children }) => {
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   const [error, setError] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Debug - check if authService is properly imported
+  useEffect(() => {
+    console.log('AuthService check:', authService);
+    if (!authService) {
+      console.error('WARNING: authService is undefined!');
+    } else if (!authService.login) {
+      console.error('WARNING: authService.login is undefined!', Object.keys(authService));
+    } else {
+      console.log('authService looks good with methods:', Object.keys(authService));
+    }
+  }, []);
 
   // Function to handle API request errors
   const handleError = (error) => {
@@ -37,33 +49,32 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const loadStoredUser = async () => {
       try {
-        console.log('Checking for stored auth token...');
-        const token = await AsyncStorage.getItem('authToken');
+        // Use authService to check authentication
+        const isAuth = await authService.isAuthenticated();
         
-        if (token) {
-          console.log('Found stored token');
+        if (isAuth) {
+          console.log('User is authenticated');
           
-          // Use stored user data instead of making API call
-          const storedUserData = await AsyncStorage.getItem('userData');
-          if (storedUserData) {
-            const userData = JSON.parse(storedUserData);
-            console.log('Using stored user data:', userData.email);
+          // Use authService to get current user
+          const userData = await authService.getCurrentUser();
+          
+          if (userData) {
+            console.log('Retrieved user data:', userData.email);
             setUser(userData);
             setIsAuthenticated(true);
           } else {
-            console.log('No stored user data, clearing token');
-            await AsyncStorage.removeItem('authToken');
+            console.log('No user data available, logging out');
+            await authService.logout();
             setIsAuthenticated(false);
           }
         } else {
-          console.log('No token found, user is not authenticated');
+          console.log('User is not authenticated');
           setIsAuthenticated(false);
         }
       } catch (error) {
-        console.error('Error loading stored user:', error);
-        // If loading fails, clear token to prevent infinite loading
-        await AsyncStorage.removeItem('authToken');
-        await AsyncStorage.removeItem('userData');
+        console.error('Error loading user:', error);
+        // If loading fails, force logout
+        await authService.logout();
         setIsAuthenticated(false);
       } finally {
         setIsLoadingInitial(false);
@@ -73,25 +84,23 @@ export const AuthProvider = ({ children }) => {
     loadStoredUser();
   }, []);
 
-  // Login function matching your backend API
+  // Login function using authService
   const login = async (email, password) => {
     setIsLoading(true);
     clearError();
     
     try {
       console.log(`Login attempt: ${email}`);
-      const response = await authAPI.login(email, password);
-      console.log('Login successful, got response:', response);
+      
+      // Use authService for login
+      const response = await authService.login(email, password);
+      console.log('Login successful');
       
       const { user: userData, token } = response;
       
       if (!userData || !token) {
         throw new Error('Invalid response format from server');
       }
-      
-      // Save token and user data
-      await AsyncStorage.setItem('authToken', token);
-      await AsyncStorage.setItem('userData', JSON.stringify(userData));
       
       // Set user and auth state
       setUser(userData);
@@ -122,14 +131,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Register function matching your backend API
+  // Register function using authService
   const register = async (userData) => {
     setIsLoading(true);
     clearError();
     
     try {
       console.log(`Registration attempt for: ${userData.email}`);
-      const response = await authAPI.register(userData);
+      
+      // Use authService for registration
+      const response = await authService.register(userData);
       console.log('Registration successful');
       
       const { user: newUser, token } = response;
@@ -137,10 +148,6 @@ export const AuthProvider = ({ children }) => {
       if (!newUser || !token) {
         throw new Error('Invalid response format from server');
       }
-      
-      // Save token and user data
-      await AsyncStorage.setItem('authToken', token);
-      await AsyncStorage.setItem('userData', JSON.stringify(newUser));
       
       // Set user and auth state
       setUser(newUser);
@@ -169,36 +176,36 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Logout function
+  // Logout function using authService
   const logout = async () => {
     setIsLoading(true);
     clearError();
     
     try {
-      // Client-side logout
-      await authAPI.logout();
-    } catch (error) {
-      console.log('Logout error:', error);
-    } finally {
-      // Clear token and user data
-      await AsyncStorage.removeItem('authToken');
-      await AsyncStorage.removeItem('userData');
+      // Use authService for logout
+      await authService.logout();
+      
+      // Update state
       setUser(null);
       setIsAuthenticated(false);
-      setIsLoading(false);
       
       // Navigate to login
       router.replace('/(auth)/login');
+    } catch (error) {
+      console.log('Logout error:', error);
+      handleError(error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Update user profile (simplified - just updates local data)
+  // Update user profile
   const updateProfile = async (userData) => {
     setIsLoading(true);
     clearError();
     
     try {
-      // Instead of making an API call, just update local storage
+      // Get current user data
       const currentUserData = user || {};
       const updatedUserData = { ...currentUserData, ...userData };
       

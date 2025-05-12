@@ -1,3 +1,4 @@
+//adminRoutes
 const express = require('express');
 const Router = express.Router();
 const User = require('../models/User'); // Adjust path as needed

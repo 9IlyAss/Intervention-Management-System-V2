@@ -17,7 +17,11 @@ const InterventionSchema = new mongoose.Schema({
   technicianId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
-  }, 
+  },
+  category :{
+    type: String,
+    enum: ['IT Services', 'Surveillance', 'Telephony', 'Printers', 'Software', 'Office Supplies', 'Maintenance', 'Alarms','Sound Systems'],
+  },
   location: {
     type: String,
     trim: true // Removes extra whitespace
