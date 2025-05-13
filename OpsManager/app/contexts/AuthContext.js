@@ -1,7 +1,7 @@
 // app/contexts/AuthContext.js
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import authService from '../services/authService'; // Import the default export properly
+import authService from '../services/authService';
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
 
@@ -30,6 +30,11 @@ export const AuthProvider = ({ children }) => {
       console.log('authService looks good with methods:', Object.keys(authService));
     }
   }, []);
+
+  // Debug - log user state changes
+  useEffect(() => {
+    console.log('USER STATE CHANGED:', user);
+  }, [user]);
 
   // Function to handle API request errors
   const handleError = (error) => {
@@ -60,7 +65,7 @@ export const AuthProvider = ({ children }) => {
           
           if (userData) {
             console.log('Retrieved user data:', userData.email);
-            console.log(userData)
+            console.log('Full user data:', userData);
             setUser(userData);
             setIsAuthenticated(true);
           } else {
@@ -200,26 +205,63 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Update user profile
+  // Update user profile - FIXED VERSION
   const updateProfile = async (userData) => {
     setIsLoading(true);
     clearError();
     
     try {
-      // Get current user data
-      const currentUserData = user || {};
-      const updatedUserData = { ...currentUserData, ...userData };
+      console.log('Updating profile with data:', userData);
       
-      // Update stored user data
-      await AsyncStorage.setItem('userData', JSON.stringify(updatedUserData));
+      // Call the authService to update profile
+      const updatedUserData = await authService.updateProfile(userData);
       
-      // Update state
-      setUser(updatedUserData);
+      if (updatedUserData) {
+        console.log('Profile updated successfully:', updatedUserData);
+        
+        // Update state with the response from the backend
+        setUser(updatedUserData);
+        
+        // Also update AsyncStorage with the latest data
+        await AsyncStorage.setItem('userData', JSON.stringify(updatedUserData));
+      } else {
+        console.log('No user data returned from updateProfile');
+      }
       
       return updatedUserData;
     } catch (error) {
+      console.error('Profile update error in context:', error);
       handleError(error);
       return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Update user password with validation handling
+  const updatePassword = async (passwordData) => {
+    setIsLoading(true);
+    clearError();
+    
+    try {
+      // Call the authService to update password
+      const response = await authService.updatePassword(passwordData);
+      console.log('Password updated successfully:', response);
+      return response;
+    } catch (error) {
+      // Handle validation errors differently than regular errors
+      if (error.isValidationError && error.code === "INCORRECT_PASSWORD") {
+        // Don't log this as an error
+        console.warn('Password validation in context:', error.message);
+        
+        // Still throw it for component handling, but don't treat as auth error
+        throw error;
+      }
+      
+      // Handle regular errors but use warn instead of error
+      console.warn('Password update issue:', error.message);
+      handleError(error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -228,6 +270,7 @@ export const AuthProvider = ({ children }) => {
   // Value object with all authentication-related properties and functions
   const value = {
     user,
+    setUser, // Expose setUser for direct updates
     isLoading,
     isLoadingInitial,
     error,
@@ -236,7 +279,8 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     clearError,
-    updateProfile
+    updateProfile,
+    updatePassword
   };
 
   // Don't render children until the initial loading is done

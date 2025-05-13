@@ -93,7 +93,7 @@ Router.get("/profile", protect, (req, res) => {
 
 Router.put("/profile", protect, async (req, res) => {
     try {
-        const { name, phone,email, profileImage } = req.body;
+        const { name, phone, email, profileImage } = req.body;
         
         // Build update object with only the fields that were provided
         const updateFields = {};
@@ -121,35 +121,70 @@ Router.put("/profile", protect, async (req, res) => {
     }
 });
 
-Router.put("/profile/image", protect, async (req, res) => {
-    try {
-        const { profileImage } = req.body;
-        
-        if (!profileImage) {
-            return res.status(400).json({ message: "Profile image URL is required" });
-        }
-        
-        // Update just the profile image
-        const updatedUser = await User.findByIdAndUpdate(
-            req.user.id,
-            { $set: { profileImage } },
-            { new: true }
-        ).select('-password');
-        
-        // Return full response with updated info
-        res.json({
-            message: "Profile image updated successfully",
-            user: {
-                id: updatedUser._id,
-                name: updatedUser.name,
-                email: updatedUser.email,
-                role: updatedUser.role,
-                profileImage: updatedUser.profileImage
-            }
-        });
-    } catch (error) {
-        console.error('Error updating profile image:', error);
-        res.status(500).json({ message: "Server Error" });
+
+Router.put('/change-password', protect, async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+
+    const user = await User.findById(req.user.id);
+    const isMatch = await user.comparePassword(oldPassword);
+    if (!isMatch) return res.status(400).json({ message: 'Current password is incorrect' });
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters.' });
     }
+
+    // Hash the new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update password securely
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      { password: hashedPassword },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    res.json({ message: 'Password updated successfully.' });
+  } catch (error) {
+    console.error('Error changing password:', error);
+    res.status(500).json({ message: 'Server error.' });
+  }
 });
+
+// Router.put("/profile/image", protect, async (req, res) => {
+//     try {
+//         const { profileImage } = req.body;
+        
+//         if (!profileImage) {
+//             return res.status(400).json({ message: "Profile image URL is required" });
+//         }
+        
+//         // Update just the profile image
+//         const updatedUser = await User.findByIdAndUpdate(
+//             req.user.id,
+//             { $set: { profileImage } },
+//             { new: true }
+//         ).select('-password');
+        
+//         // Return full response with updated info
+//         res.json({
+//             message: "Profile image updated successfully",
+//             user: {
+//                 id: updatedUser._id,
+//                 name: updatedUser.name,
+//                 email: updatedUser.email,
+//                 role: updatedUser.role,
+//                 profileImage: updatedUser.profileImage
+//             }
+//         });
+//     } catch (error) {
+//         console.error('Error updating profile image:', error);
+//         res.status(500).json({ message: "Server Error" });
+//     }
+// });
 module.exports = Router;

@@ -372,22 +372,7 @@ export default function PersonalInformation() {
           </View>
         )}
 
-        {/* Password Section */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Security</Text>
-          
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Password</Text>
-            <Text style={styles.fieldValue}>********</Text>
-          </View>
-          
-          <TouchableOpacity 
-            style={styles.changePasswordButton}
-            onPress={() => router.push('/(shared)/profile/password')}
-          >
-            <Text style={styles.changePasswordText}>Change Password</Text>
-          </TouchableOpacity>
-        </View>
+
       </ScrollView>
       
       {isEditing && (

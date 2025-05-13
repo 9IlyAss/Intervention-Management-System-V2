@@ -150,7 +150,50 @@ const authService = {
       log('Error updating profile:', error.response?.data || error.message);
       throw error;
     }
+  },
+  // Update user password
+// Update user password 
+  updatePassword: async (userData) => {
+  try {
+    log('Updating user password with:', userData);
+    
+    // Make API call to update profile
+    const response = await api.put('/api/auth/change-password', userData);
+    
+    log('Password update response received:', response.data);
+    
+    // Update stored user data
+    if (response.data) {
+      await AsyncStorage.setItem('userData', JSON.stringify(response.data));
+    }
+    
+    return response.data;
+  } catch (error) {
+    // Special case for incorrect password
+    if (error.response && 
+        error.response.status === 400 && 
+        error.response.data && 
+        error.response.data.message === "Current password is incorrect") {
+      
+      console.log('Creating validation error for incorrect password');
+      
+      // Create a special error type
+      const validationError = new Error(error.response.data.message);
+      validationError.isValidationError = true;
+      validationError.code = "INCORRECT_PASSWORD";
+      validationError.status = 400;
+      
+      // Use console.warn instead of log
+      console.warn('Password validation:', error.response.data.message);
+      
+      throw validationError;
+    }
+    
+    // For other errors, log as usual
+    log('Error updating password:', error.response?.data || error.message);
+    throw error;
   }
+}
 
 };
 
