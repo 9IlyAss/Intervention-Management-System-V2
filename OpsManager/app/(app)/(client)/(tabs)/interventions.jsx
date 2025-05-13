@@ -1,4 +1,4 @@
-// app/(app)/(client)/interventions.jsx
+// app/(app)/(client)/(tabs)/interventions.jsx - For Updated Backend
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -8,19 +8,23 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StatusBar,
+  RefreshControl,
+  Alert
 } from 'react-native';
 import { ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '../../../contexts/AuthContext';
-import { interventionAPI } from '../../../services/api';
+import clientService from '../../../services/clientService';
 
 export default function InterventionsScreen() {
   const { user } = useAuth();
   const [interventions, setInterventions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     loadInterventions();
@@ -28,107 +32,138 @@ export default function InterventionsScreen() {
 
   const loadInterventions = async () => {
     setIsLoading(true);
+    setError(null);
+    
     try {
-      // This would be replaced with actual API call when implemented
-      // const response = await interventionAPI.getAll({ client: user.id });
-      // setInterventions(response.interventions || []);
+      // Use the API call from clientService - no fallback to mock data
+      const data = await clientService.getClientInterventions();
       
-      // For now, use placeholder data
-      setTimeout(() => {
-        setInterventions([
-          {
-            id: '1',
-            title: 'AC Maintenance',
-            description: 'Regular maintenance for the air conditioning unit',
-            status: 'scheduled',
-            category: 'Air Conditioning',
-            date: new Date(2025, 5, 15),
-            technician: 'John Smith'
-          },
-          {
-            id: '2',
-            title: 'Internet Troubleshooting',
-            description: 'Fix internet connectivity issues in the main office',
-            status: 'in_progress',
-            category: 'Network & IT',
-            date: new Date(2025, 5, 10),
-            technician: 'Sarah Johnson'
-          },
-          {
-            id: '3',
-            title: 'Plumbing Repair',
-            description: 'Fix leaking faucet in the kitchen area',
-            status: 'completed',
-            category: 'Plumbing',
-            date: new Date(2025, 5, 5),
-            technician: 'Michael Brown'
-          },
-          {
-            id: '4',
-            title: 'Electrical Wiring Check',
-            description: 'Inspect wiring in the conference room',
-            status: 'completed',
-            category: 'Electrical',
-            date: new Date(2025, 4, 25),
-            technician: 'Emily Davis'
-          },
-          {
-            id: '5',
-            title: 'Office Cleaning',
-            description: 'Deep cleaning of office premises',
-            status: 'cancelled',
-            category: 'Cleaning',
-            date: new Date(2025, 4, 15),
-            technician: null
+      console.log('API response data:', data); // Debug log
+      
+      // Format the data for display - with updated backend, we now have full data
+      const formattedInterventions = data.map((intervention, index) => {
+        // Check if technicianId exists and has a name property
+        let technicianName = null;
+        if (intervention.technicianId) {
+          // If it's a populated object, get the name
+          if (typeof intervention.technicianId === 'object' && intervention.technicianId.name) {
+            technicianName = intervention.technicianId.name;
+          } 
+          // If it's just an ID without population, store that we have a technician but no name
+          else if (typeof intervention.technicianId === 'string' || intervention.technicianId._id) {
+            technicianName = "Assigned Technician";
           }
-        ]);
-        setIsLoading(false);
-      }, 1000);
+        }
+        
+        return {
+          id: intervention._id,
+          title: intervention.title || 'Untitled Request',
+          description: intervention.description || 'No description provided',
+          status: intervention.status || 'Pending',
+          category: intervention.category || 'Maintenance',
+          date: new Date(intervention.createdAt || Date.now()),
+          technician: technicianName
+        };
+      });
+      
+      setInterventions(formattedInterventions);
     } catch (error) {
       console.error('Failed to load interventions:', error);
+      setError('Failed to load service requests. Pull down to refresh or check your connection.');
+      setInterventions([]); // Set to empty array - no mock data
+      
+      // Show error alert
+      Alert.alert(
+        'Connection Error',
+        'Unable to load your service requests. Please check your connection and try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
       setIsLoading(false);
     }
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadInterventions();
+    setRefreshing(false);
+  };
+
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'scheduled':
-        return '#2196F3';
-      case 'in_progress':
-        return '#FF9800';
+    // Normalize status to lowercase for case-insensitive comparison
+    const normalizedStatus = status.toLowerCase();
+    
+    switch (normalizedStatus) {
+      case 'pending':
+        return '#FF9800'; // Orange
+      case 'in progress':
+        return '#2196F3'; // Blue
       case 'completed':
-        return '#4CAF50';
+        return '#4CAF50'; // Green
       case 'cancelled':
-        return '#F44336';
+        return '#F44336'; // Red
       default:
-        return '#9E9E9E';
+        return '#757575'; // Grey
     }
   };
 
   const getIconForCategory = (category) => {
-    switch (category) {
-      case 'Air Conditioning':
-        return 'snow-outline';
-      case 'Network & IT':
-        return 'wifi-outline';
-      case 'Plumbing':
-        return 'water-outline';
-      case 'Electrical':
-        return 'flash-outline';
-      case 'Security':
-        return 'shield-outline';
-      case 'Cleaning':
-        return 'sparkles-outline';
-      default:
-        return 'construct-outline';
-    }
+    const categoryIcons = {
+      'IT Services': 'desktop-outline',
+      'Surveillance': 'videocam-outline',
+      'Telephony': 'call-outline',
+      'Printers': 'print-outline',
+      'Software': 'code-outline',
+      'Office Supplies': 'briefcase-outline',
+      'Maintenance': 'construct-outline',
+      'Alarms': 'notifications-outline',
+      'Sound Systems': 'volume-high-outline',
+    };
+    
+    return categoryIcons[category] || 'construct-outline';
   };
 
   const filterInterventions = () => {
     if (activeFilter === 'all') {
       return interventions;
     }
-    return interventions.filter(item => item.status === activeFilter);
+    
+    // Direct filter without mapping since we're using the database status values
+    return interventions.filter(item => {
+      // Convert to lowercase for case-insensitive comparison
+      const itemStatus = item.status.toLowerCase();
+      
+      // Convert scheduled to pending for filtering
+      if (activeFilter === 'scheduled') {
+        return itemStatus === 'pending';
+      }
+      
+      // Convert filter options to match database status values
+      if (activeFilter === 'in_progress') {
+        return itemStatus === 'in progress';
+      }
+      
+      // Match the database values directly for completed and cancelled
+      return itemStatus === activeFilter;
+    });
+  };
+
+  const getDisplayStatus = (status) => {
+    // Convert database status to user-friendly display format
+    const normalizedStatus = status.toLowerCase();
+    
+    switch (normalizedStatus) {
+      case 'pending':
+        return 'Scheduled';
+      case 'in progress':
+        return 'In Progress';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status;
+    }
   };
 
   const renderInterventionItem = ({ item }) => (
@@ -159,7 +194,7 @@ export default function InterventionsScreen() {
               { color: getStatusColor(item.status) },
             ]}
           >
-            {item.status.replace('_', ' ')}
+            {getDisplayStatus(item.status)}
           </Text>
         </View>
       </View>
@@ -193,14 +228,23 @@ export default function InterventionsScreen() {
 
   const renderEmptyList = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="document-text-outline" size={64} color="#CCCCCC" />
-      <Text style={styles.emptyText}>No service requests found</Text>
-      <TouchableOpacity
-        style={styles.createButton}
-        onPress={() => router.push('/(app)/(client)/create')}
-      >
-        <Text style={styles.createButtonText}>Create New Request</Text>
-      </TouchableOpacity>
+      {error ? (
+        <>
+          <Ionicons name="cloud-offline-outline" size={64} color="#CCCCCC" />
+          <Text style={styles.emptyText}>{error}</Text>
+        </>
+      ) : (
+        <>
+          <Ionicons name="document-text-outline" size={64} color="#CCCCCC" />
+          <Text style={styles.emptyText}>No service requests found</Text>
+          <TouchableOpacity
+            style={styles.createButton}
+            onPress={() => router.push('/(app)/(client)/create')}
+          >
+            <Text style={styles.createButtonText}>Create New Request</Text>
+          </TouchableOpacity>
+        </>
+      )}
     </View>
   );
 
@@ -248,7 +292,7 @@ export default function InterventionsScreen() {
         </ScrollView>
       </View>
       
-      {isLoading ? (
+      {isLoading && !refreshing ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#6200EE" />
           <Text style={styles.loadingText}>Loading service requests...</Text>
@@ -257,9 +301,16 @@ export default function InterventionsScreen() {
         <FlatList
           data={filterInterventions()}
           renderItem={renderInterventionItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => (item.id ? item.id.toString() : `temp-id-${Math.random()}`)}
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={renderEmptyList}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={["#6200EE"]}
+            />
+          }
         />
       )}
     </SafeAreaView>
@@ -313,6 +364,7 @@ const styles = StyleSheet.create({
   listContainer: {
     padding: 16,
     paddingBottom: 80, // Extra space for tab bar
+    flexGrow: 1, // Ensures the empty state centers properly
   },
   interventionCard: {
     backgroundColor: '#FFFFFF',
@@ -401,6 +453,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 16,
     marginBottom: 24,
+    textAlign: 'center',
   },
   createButton: {
     backgroundColor: '#6200EE',
@@ -412,5 +465,5 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '500',
     fontSize: 14,
-  },
+  }
 });

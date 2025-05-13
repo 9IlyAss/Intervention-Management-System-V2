@@ -128,7 +128,30 @@ const authService = {
       log('Error fetching user profile:', error.response?.data || error.message);
       throw error;
     }
+  },
+ // Update user profile
+// Update user profile - FIXED VERSION
+  updateProfile: async (userData) => {
+    try {
+      log('Updating user profile with:', userData);
+      
+      // Make API call to update profile
+      const response = await api.put('/api/auth/profile', userData);
+      
+      log('Profile update response received:', response.data);
+      
+      // Update stored user data
+      if (response.data) {
+        await AsyncStorage.setItem('userData', JSON.stringify(response.data));
+      }
+      
+      return response.data;
+    } catch (error) {
+      log('Error updating profile:', error.response?.data || error.message);
+      throw error;
+    }
   }
+
 };
 
 export default authService;

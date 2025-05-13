@@ -1,5 +1,5 @@
 // app/(app)/(client)/profile.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,7 +20,8 @@ export default function ClientProfile() {
   const { user, logout } = useAuth();
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
-  
+
+
   const handleLogout = () => {
     Alert.alert(
       'Confirm Logout',
@@ -45,42 +46,42 @@ export default function ClientProfile() {
       title: 'Personal Information',
       icon: 'person-outline',
       color: '#6200EE',
-      onPress: () => router.push('/(app)/(client)/edit-profile'),
+      onPress: () => router.push('/(shared)/profile/personal-info'),
     },
     {
-      id: 'payment',
-      title: 'Payment Methods',
-      icon: 'card-outline',
+      id: 'password',
+      title: 'Change Password',
+      icon: 'lock-closed-outline',
       color: '#4CAF50',
-      onPress: () => router.push('/(app)/(client)/payment-methods'),
+      onPress: () => router.push('/(shared)/profile/password'),
     },
     {
-      id: 'addresses',
-      title: 'Saved Addresses',
-      icon: 'location-outline',
+      id: 'language',
+      title: 'Language & Region',
+      icon: 'globe-outline',
       color: '#2196F3',
-      onPress: () => router.push('/(app)/(client)/addresses'),
+      onPress: () => router.push('/(shared)/profile/language-region'),
     },
     {
       id: 'help',
       title: 'Help & Support',
       icon: 'help-circle-outline',
       color: '#FF9800',
-      onPress: () => router.push('/(app)/(client)/support'),
+      onPress: () => router.push('/(shared)/profile/support'),
     },
     {
       id: 'about',
       title: 'About Us',
       icon: 'information-circle-outline',
       color: '#9C27B0',
-      onPress: () => router.push('/(app)/(client)/about'),
+      onPress: () => router.push('/(shared)/profile/about'),
     },
   ];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
+
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
       </View>
@@ -107,12 +108,7 @@ export default function ClientProfile() {
           <Text style={styles.profileName}>{user?.name || 'Client Name'}</Text>
           <Text style={styles.profileEmail}>{user?.email || 'client@example.com'}</Text>
           
-          <TouchableOpacity 
-            style={styles.editProfileButton}
-            onPress={() => router.push('/(app)/(client)/edit-profile')}
-          >
-            <Text style={styles.editProfileText}>Edit Profile</Text>
-          </TouchableOpacity>
+         
         </View>
         
         <View style={styles.section}>

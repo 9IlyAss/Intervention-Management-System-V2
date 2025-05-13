@@ -49,7 +49,7 @@ export default function ChatListScreen() {
         return {
           id: room.chatRoomId || `chat-${Date.now()}-${Math.random().toString(36).substring(7)}`,
           name: room.clientName, // In this case it's the technician name
-          avatar: null,
+          avatar: room.technicianImage,
           lastMessage: lastMessage,
           timestamp: new Date(),
           unread: 0, // You would get this from the API in a real app

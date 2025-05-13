@@ -35,6 +35,7 @@ Router.post("/register", async (req, res) => {
                     name: newUser.name,
                     email: newUser.email,
                     role: newUser.role,
+                    
                 },
                 token,
             });
@@ -71,6 +72,9 @@ Router.post("/login", async (req, res) => {
                     name: user.name,
                     email: user.email,
                     role: user.role,
+                    profileImage: user.profileImage,
+                    phone:user.phone,
+
                 },
                 token,
             });
@@ -87,4 +91,65 @@ Router.get("/profile", protect, (req, res) => {
     res.json(req.user);
 });
 
+Router.put("/profile", protect, async (req, res) => {
+    try {
+        const { name, phone,email, profileImage } = req.body;
+        
+        // Build update object with only the fields that were provided
+        const updateFields = {};
+        if (name) updateFields.name = name;
+        if (phone) updateFields.phone = phone;
+        if (email) updateFields.email = email;
+
+        if (profileImage) updateFields.profileImage = profileImage;
+        
+        // Update user profile
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user.id,
+            { $set: updateFields },
+            { new: true }
+        ).select('-password');
+        
+        if (!updatedUser) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        
+        res.json(updatedUser);
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        res.status(500).json({ message: "Server Error" });
+    }
+});
+
+Router.put("/profile/image", protect, async (req, res) => {
+    try {
+        const { profileImage } = req.body;
+        
+        if (!profileImage) {
+            return res.status(400).json({ message: "Profile image URL is required" });
+        }
+        
+        // Update just the profile image
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user.id,
+            { $set: { profileImage } },
+            { new: true }
+        ).select('-password');
+        
+        // Return full response with updated info
+        res.json({
+            message: "Profile image updated successfully",
+            user: {
+                id: updatedUser._id,
+                name: updatedUser.name,
+                email: updatedUser.email,
+                role: updatedUser.role,
+                profileImage: updatedUser.profileImage
+            }
+        });
+    } catch (error) {
+        console.error('Error updating profile image:', error);
+        res.status(500).json({ message: "Server Error" });
+    }
+});
 module.exports = Router;

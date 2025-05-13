@@ -60,6 +60,7 @@ export const AuthProvider = ({ children }) => {
           
           if (userData) {
             console.log('Retrieved user data:', userData.email);
+            console.log(userData)
             setUser(userData);
             setIsAuthenticated(true);
           } else {

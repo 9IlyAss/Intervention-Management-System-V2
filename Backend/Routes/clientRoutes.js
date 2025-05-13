@@ -43,15 +43,16 @@ Router.post('/submit', protect, async (req, res) => {
 Router.get('/interventions', protect, async (req, res) => {
     try {
         const limit = parseInt(req.query.limit); // optional query param
-        let query = Intervention.find(
-            { clientId: req.user.id },
-            { title: 1, status: 1, _id: 0 }
-        ).sort({ createdAt: -1 });
-
+        
+        // CHANGED: Include all fields and populate technician
+        let query = Intervention.find({ clientId: req.user.id })
+            .populate('technicianId', 'name profileImage') // Add technician name
+            .sort({ createdAt: -1 });
+            
         if (!isNaN(limit)) {
             query = query.limit(limit);
         }
-
+        
         const interventions = await query;
         res.json(interventions);
     } catch (error) {
@@ -67,7 +68,7 @@ Router.get('/interventions/:id', protect, async (req, res) => {
         const intervention = await Intervention.findOne({
             _id: req.params.id,
             clientId: req.user.id
-        }).populate('technicianId', 'name email phone');
+        }).populate('technicianId', 'name email phone profileImage');
         
         if (!intervention) {
             return res.status(404).json({ error: 'Intervention not found' });
@@ -77,6 +78,18 @@ Router.get('/interventions/:id', protect, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+// @route delete /api/client/interventions/:id
+// @desc cancel specific intervention request
+// @access Private (Client)
+Router.delete('/interventions/:id', protect, async (req, res) => {
+    try {
+        await Intervention.findOneAndDelete({_id: req.params.id,})
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
 // @route POST /api/client/feedback/:interventionId
 // @desc Submit feedback for an intervention
@@ -127,7 +140,7 @@ Router.get('/chat', protect, async (req, res) => {
         console.log(`Getting chat rooms for client ID: ${req.user.id}`);
         
         const chatRooms = await ChatRoom.find({ 'participants.clientId': req.user.id })
-            .populate('participants.technicianId', 'name')
+            .populate('participants.technicianId', 'name profileImage')
             .populate('interventionId', 'title')
             .sort({ updatedAt: -1 });
 
@@ -137,6 +150,7 @@ Router.get('/chat', protect, async (req, res) => {
         const simplified = chatRooms.map(chat => ({
             chatRoomId: chat._id,
             clientName: chat.participants.technicianId ? chat.participants.technicianId.name : 'Unknown',
+            technicianImage:  chat.participants.technicianId.profileImage,
             interventionTitle: chat.interventionId ? chat.interventionId.title : 'General Chat'
         }));
 
