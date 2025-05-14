@@ -7,20 +7,28 @@ const { protect } = require("../middleware/authMiddleware");
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Types.ObjectId;
 
-// @route GET /api/technician/interventions
-// @desc Get all interventions assigned to technician
+// @route GET /api/technician/interventions?limit=2
+// @desc Get all interventions assigned to technician, optionally limited
 // @access Private (Technician)
 Router.get('/interventions', protect, async (req, res) => {
     try {
-        const interventions = await Intervention.find({ technicianId: req.user.id })
-            .populate('clientId', 'name email phone profileImage')
+        const limit = parseInt(req.query.limit); // optional query param
+        
+        let query = Intervention.find({ technicianId: req.user.id })
+            .populate('clientId', 'name email phone profileImage') // Add client details
             .sort({ createdAt: -1 });
             
+        if (!isNaN(limit)) {
+            query = query.limit(limit);
+        }
+        
+        const interventions = await query;
         res.json(interventions);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
+
 
 // @route GET /api/technician/interventions/:id
 // @desc Get specific intervention details

@@ -1,4 +1,4 @@
-// app/(app)/(client)/dashboard.jsx
+// app/(app)/(technician)/(tabs)/dashboard.jsx
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -8,50 +8,85 @@ import {
   TouchableOpacity,
   RefreshControl,
   StatusBar,
-  Alert,
+  Switch,
+  Image,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '../../../contexts/AuthContext';
-import clientService from '../../../services/clientService';
+import technicianService from '../../../services/technicianService';
 
-export default function ClientDashboard() {
+export default function TechnicianDashboard() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [interventions, setInterventions] = useState([]);
+  const [stats, setStats] = useState({
+    completed: 0,
+    inProgress: 0,
+    pending: 0,
+    cancelled: 0
+  });
+  const [isAvailable, setIsAvailable] = useState(true);
   const [error, setError] = useState(null);
+  const [statusUpdateVisible, setStatusUpdateVisible] = useState(false);
+  const [selectedIntervention, setSelectedIntervention] = useState(null);
   
   // Load interventions on component mount
   useEffect(() => {
-    fetchInterventions();
+    fetchDashboardData();
   }, []);
 
-  // Function to fetch client interventions
-  const fetchInterventions = async () => {
+  // Function to fetch technician dashboard data
+  const fetchDashboardData = async () => {
     try {
       setError(null);
       setIsLoading(true);
       
-      // Get only 3 most recent interventions for the dashboard
-      const data = await clientService.getClientInterventions(2);
+      // Get assigned interventions
+      const interventionsData = await technicianService.getTechnicianInterventions();
       
-      // Format the data for display
-      const formattedInterventions = data.map(intervention => ({
+      // Format the interventions data for display
+      const formattedInterventions = interventionsData.map(intervention => ({
         id: intervention._id || intervention.id,
         title: intervention.title,
-        date: new Date(intervention.createdAt || Date.now()).toLocaleDateString(),
-        time: new Date(intervention.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        technician: intervention.technicianId?.name || 'Unassigned',
-        status: intervention.status.toLowerCase() || 'pending'
+        description: intervention.description || 'No description provided',
+        clientName: intervention.clientId?.name || 'Unknown Client',
+        clientAddress: intervention.clientId?.location || 'No address provided',
+        clientPhone: intervention.clientId?.phone || 'No phone provided',
+        date: new Date(intervention.scheduledDate || intervention.createdAt || Date.now()).toLocaleDateString(),
+        time: new Date(intervention.scheduledDate || intervention.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        serviceType: intervention.category || 'General',
+        status: intervention.status.toLowerCase() || 'pending',
+        hasChat: true, // Simplified for now, implement chat detection logic if needed
+        imageUrl: intervention.clientId?.profileImage || null,
+        category: intervention.category || 'General Services',
+        location: intervention.location || 'No location provided',
       }));
       
+      // Calculate statistics
+      const completedCount = formattedInterventions.filter(i => i.status === 'completed').length;
+      const inProgressCount = formattedInterventions.filter(i => i.status === 'in progress').length;
+      const pendingCount = formattedInterventions.filter(i => i.status === 'pending').length;
+      const cancelledCount = formattedInterventions.filter(i => i.status === 'cancelled').length;
+      
       setInterventions(formattedInterventions);
+      setStats({
+        completed: completedCount,
+        inProgress: inProgressCount,
+        pending: pendingCount,
+        cancelled: cancelledCount
+      });
+      
+      // Get technician availability status
+      const techStatus = await technicianService.getTechnicianStatus();
+      setIsAvailable(techStatus.isAvailable);
+      
     } catch (err) {
-      console.error('Failed to load interventions:', err);
-      setError('Failed to load interventions. Please try again.');
+      console.error('Failed to load dashboard data:', err);
+      setError('Failed to load your assignments. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -60,32 +95,113 @@ export default function ClientDashboard() {
   // Handle pull-to-refresh
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchInterventions();
+    await fetchDashboardData();
     setRefreshing(false);
   };
 
-  // Navigate to create a new intervention
-  const handleCreateIntervention = () => {
-    router.push('/(app)/(client)/create');
+  // Toggle availability status
+  const toggleAvailability = async () => {
+    try {
+      const newStatus = !isAvailable;
+      setIsAvailable(newStatus);
+      await technicianService.updateTechnicianStatus(newStatus);
+    } catch (err) {
+      console.error('Failed to update status:', err);
+      setIsAvailable(!isAvailable); // Revert if failed
+      setError('Failed to update your availability status.');
+    }
   };
 
   // Navigate to view intervention details
   const handleViewIntervention = (interventionId) => {
-    router.push(`/(app)/(client)/intervention/${interventionId}`);
+    router.push(`/(app)/(technician)/intervention/${interventionId}`);
   };
 
-  // Service categories for quick access
-  const serviceCategories = [
-    { id: '1', name: 'IT Services', icon: 'desktop', color: '#2196F3' },
-    { id: '2', name: 'Surveillance', icon: 'videocam', color: '#9C27B0' },
-    { id: '3', name: 'Telephony', icon: 'call', color: '#4CAF50' },
-    { id: '4', name: 'Printers', icon: 'print', color: '#FF9800' },
-    { id: '5', name: 'Software', icon: 'code', color: '#F44336' },
-    { id: '6', name: 'Office Supplies', icon: 'briefcase', color: '#00BCD4' },
-    { id: '7', name: 'Maintenance', icon: 'construct', color: '#607D8B' },
-    { id: '8', name: 'Alarms', icon: 'notifications', color: '#E91E63' },
-    { id: '9', name: 'Sound Systems', icon: 'volume-high', color: '#795548' },
-  ];
+  // Navigate to client chat
+  const handleOpenChat = (interventionId) => {
+    router.push(`/(app)/(technician)/chat/${interventionId}`);
+  };
+
+  // Navigate to update intervention status
+  const handleUpdateStatus = (intervention) => {
+    setSelectedIntervention(intervention);
+    setStatusUpdateVisible(true);
+  };
+  
+  // Close status update modal
+  const closeStatusUpdate = () => {
+    setStatusUpdateVisible(false);
+    setSelectedIntervention(null);
+  };
+  
+  // Update intervention status
+  const updateInterventionStatus = async (newStatus) => {
+    try {
+      if (!selectedIntervention) return;
+      
+      // Format status to match backend enum (capitalize first letter)
+      const formattedStatus = capitalizeFirstLetter(newStatus);
+      
+      // Call API to update status
+      await technicianService.updateInterventionStatus(selectedIntervention.id, formattedStatus);
+      
+      // Update local state to reflect the change
+      const updatedInterventions = interventions.map(item => 
+        item.id === selectedIntervention.id 
+          ? { ...item, status: newStatus.toLowerCase() } 
+          : item
+      );
+      
+      setInterventions(updatedInterventions);
+      
+      // Recalculate stats
+      const completedCount = updatedInterventions.filter(i => i.status === 'completed').length;
+      const inProgressCount = updatedInterventions.filter(i => i.status === 'in progress').length;
+      const pendingCount = updatedInterventions.filter(i => i.status === 'pending').length;
+      const cancelledCount = updatedInterventions.filter(i => i.status === 'cancelled').length;
+      
+      setStats({
+        completed: completedCount,
+        inProgress: inProgressCount,
+        pending: pendingCount,
+        cancelled: cancelledCount
+      });
+      
+      // Close modal
+      closeStatusUpdate();
+    } catch (err) {
+      console.error('Failed to update status:', err);
+      setError('Failed to update intervention status.');
+    }
+  };
+
+  // Helper function to get icon for category
+  const getCategoryIcon = (category) => {
+    if (!category) return 'construct';
+    
+    switch (category.toLowerCase()) {
+      case 'it services':
+        return 'desktop-outline';
+      case 'surveillance':
+        return 'videocam';
+      case 'telephony':
+        return 'call';
+      case 'printers':
+        return 'print';
+      case 'software':
+        return 'code-slash';
+      case 'office supplies':
+        return 'briefcase';
+      case 'maintenance':
+        return 'hammer';
+      case 'alarms':
+        return 'notifications';
+      case 'sound systems':
+        return 'volume-high';
+      default:
+        return 'construct';
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -94,12 +210,24 @@ export default function ClientDashboard() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Hello, {user?.name || 'Client'}</Text>
-          <Text style={styles.subGreeting}>What service do you need today?</Text>
+          <Text style={styles.greeting}>Hello, {user?.name ? user.name : 'Technician'}</Text>
+          <View style={styles.availabilityContainer}>
+            <Text style={styles.availabilityText}>
+              Status: {isAvailable ? 'Available' : 'Unavailable'}
+            </Text>
+            <Switch
+              trackColor={{ false: '#9E9E9E', true: '#B39DDB' }}
+              thumbColor={isAvailable ? '#6200EE' : '#F4F3F4'}
+              ios_backgroundColor="#9E9E9E"
+              onValueChange={toggleAvailability}
+              value={isAvailable}
+              style={styles.switch}
+            />
+          </View>
         </View>
         <TouchableOpacity 
           style={styles.notificationButton}
-          onPress={() => router.push('/(app)/(client)/notifications')}
+          onPress={() => router.push('/(app)/(technician)/notifications')}
         >
           <Ionicons name="notifications" size={24} color="#FFFFFF" />
           {/* Notification badge */}
@@ -114,36 +242,47 @@ export default function ClientDashboard() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#6200EE']} />
         }
       >
-        {/* Service Categories */}
-        <View style={styles.categoriesSection}>
-          <Text style={styles.sectionTitle}>Services</Text>
-          <View style={styles.categoriesGrid}>
-            {serviceCategories.map((category) => (
-              <TouchableOpacity
-                key={category.id}
-                style={styles.categoryItem}
-                onPress={() => {
-                  // Create new intervention with pre-selected category
-                  router.push({
-                    pathname: '/(app)/(client)/create',
-                    params: { category: category.id, categoryName: category.name }
-                  });
-                }}
-              >
-                <View style={[styles.categoryIcon, { backgroundColor: `${category.color}15` }]}>
-                  <Ionicons name={category.icon} size={24} color={category.color} />
-                </View>
-                <Text style={styles.categoryName}>{category.name}</Text>
-              </TouchableOpacity>
-            ))}
+        {/* Stats Summary */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statCard}>
+            <View style={styles.statIconContainer}>
+              <Ionicons name="time-outline" size={20} color="#FFFFFF" />
+            </View>
+            <Text style={styles.statValue}>{stats.pending}</Text>
+            <Text style={styles.statLabel}>Pending</Text>
+            <View style={[styles.statIndicator, { backgroundColor: '#FF9800' }]} />
+          </View>
+          <View style={styles.statCard}>
+            <View style={[styles.statIconContainer, { backgroundColor: '#2196F3' }]}>
+              <Ionicons name="construct-outline" size={20} color="#FFFFFF" />
+            </View>
+            <Text style={styles.statValue}>{stats.inProgress}</Text>
+            <Text style={styles.statLabel}>In Progress</Text>
+            <View style={[styles.statIndicator, { backgroundColor: '#2196F3' }]} />
+          </View>
+          <View style={styles.statCard}>
+            <View style={[styles.statIconContainer, { backgroundColor: '#4CAF50' }]}>
+              <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+            </View>
+            <Text style={styles.statValue}>{stats.completed}</Text>
+            <Text style={styles.statLabel}>Completed</Text>
+            <View style={[styles.statIndicator, { backgroundColor: '#4CAF50' }]} />
+          </View>
+          <View style={styles.statCard}>
+            <View style={[styles.statIconContainer, { backgroundColor: '#F44336' }]}>
+              <Ionicons name="close-circle-outline" size={20} color="#FFFFFF" />
+            </View>
+            <Text style={styles.statValue}>{stats.cancelled}</Text>
+            <Text style={styles.statLabel}>Cancelled</Text>
+            <View style={[styles.statIndicator, { backgroundColor: '#F44336' }]} />
           </View>
         </View>
         
-        {/* Recent Interventions Section */}
-        <View style={styles.appointmentsSection}>
+        {/* Recent Assignments */}
+        <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Requests</Text>
-            <TouchableOpacity onPress={() => router.push('/(app)/(client)/(tabs)/interventions')}>
+            <Text style={styles.sectionTitle}>Recent Assignments</Text>
+            <TouchableOpacity onPress={() => router.push('/(app)/(technician)/Assignment')}>
               <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
           </View>
@@ -151,55 +290,103 @@ export default function ClientDashboard() {
           {isLoading && !refreshing ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#6200EE" />
-              <Text style={styles.loadingText}>Loading your requests...</Text>
+              <Text style={styles.loadingText}>Loading your assignments...</Text>
             </View>
           ) : error ? (
             <TouchableOpacity 
               style={styles.errorContainer} 
-              onPress={fetchInterventions}
+              onPress={fetchDashboardData}
             >
               <Ionicons name="refresh" size={24} color="#F44336" />
               <Text style={styles.errorText}>{error}</Text>
             </TouchableOpacity>
           ) : interventions.length > 0 ? (
-            interventions.map((intervention) => (
+            interventions.slice(0, 2).map((item) => (
               <TouchableOpacity
-                key={intervention.id}
-                style={styles.appointmentCard}
-                onPress={() => handleViewIntervention(intervention.id)}
+                key={item.id}
+                style={styles.assignmentCard}
+                onPress={() => handleViewIntervention(item.id)}
               >
-                <View style={styles.appointmentIconContainer}>
-                  <Ionicons 
-                    name={getStatusIcon(intervention.status)} 
-                    size={24} 
-                    color={getStatusColor(intervention.status)} 
-                  />
+                <View style={styles.assignmentHeader}>
+                  <View style={styles.assignmentStatus}>
+                    <View 
+                      style={[
+                        styles.statusDot, 
+                        { backgroundColor: getStatusColor(item.status) }
+                      ]} 
+                    />
+                    <Text style={[
+                      styles.statusText, 
+                      { color: getStatusColor(item.status) }
+                    ]}>
+                      {capitalizeFirstLetter(item.status)}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.assignmentDateContainer}>
+                    <Ionicons name="calendar" size={14} color="#757575" />
+                    <Text style={styles.assignmentDate}>{item.date} · {item.time}</Text>
+                  </View>
                 </View>
-                <View style={styles.appointmentDetails}>
-                  <Text style={styles.appointmentTitle}>{intervention.title}</Text>
-                  <Text style={styles.appointmentTime}>
-                    {intervention.date} · {intervention.time}
-                  </Text>
-                  <Text style={styles.technicianName}>
-                    <Ionicons name="person" size={14} color="#666" /> {intervention.technician}
-                  </Text>
+                
+                <Text style={styles.assignmentTitle}>{item.title}</Text>
+                
+                <View style={styles.clientInfoContainer}>
+                  {item.imageUrl ? (
+                    <Image source={{ uri: item.imageUrl }} style={styles.clientImage} />
+                  ) : (
+                    <View style={styles.clientImagePlaceholder}>
+                      <Ionicons name="person" size={16} color="#FFFFFF" />
+                    </View>
+                  )}
+                  <View style={styles.clientDetails}>
+                    <Text style={styles.clientName}>{item.clientName}</Text>
+                    <Text style={styles.clientAddress} numberOfLines={1}>{item.location || item.clientAddress}</Text>
+                  </View>
                 </View>
-                <View style={[
-                  styles.statusIndicator, 
-                  { backgroundColor: getStatusColor(intervention.status) }
-                ]} />
+                
+                <View style={styles.assignmentFooter}>
+                  <View style={styles.serviceTypeContainer}>
+                    <Ionicons 
+                      name={getCategoryIcon(item.category)} 
+                      size={14} 
+                      color="#6200EE" 
+                    />
+                    <Text style={styles.serviceTypeText}>{item.category}</Text>
+                  </View>
+                  
+                  <View style={styles.assignmentActions}>
+                    <TouchableOpacity 
+                      style={styles.statusButton}
+                      onPress={() => handleUpdateStatus(item)}
+                    >
+                      <Ionicons name="sync" size={16} color="white" />
+                      <Text style={styles.statusButtonText}>Status</Text>
+                    </TouchableOpacity>
+                    
+                    {item.hasChat && (
+                      <TouchableOpacity 
+                        style={styles.chatButton}
+                        onPress={() => handleOpenChat(item.id)}
+                      >
+                        <Ionicons name="chatbubble" size={16} color="#6200EE" />
+                      </TouchableOpacity>
+                    )}
+                    
+                    <TouchableOpacity 
+                      style={styles.cameraButton}
+                      onPress={() => router.push(`/(app)/(technician)/capture/${item.id}`)}
+                    >
+                      <Ionicons name="camera" size={16} color="#6200EE" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </TouchableOpacity>
             ))
           ) : (
             <View style={styles.emptyState}>
-              <Ionicons name="document-text" size={48} color="#E0E0E0" />
-              <Text style={styles.emptyText}>No requests yet</Text>
-              <TouchableOpacity 
-                style={styles.createButton}
-                onPress={handleCreateIntervention}
-              >
-                <Text style={styles.createButtonText}>Create New Request</Text>
-              </TouchableOpacity>
+              <Ionicons name="clipboard" size={48} color="#E0E0E0" />
+              <Text style={styles.emptyText}>No assignments yet</Text>
             </View>
           )}
         </View>
@@ -209,30 +396,89 @@ export default function ClientDashboard() {
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.quickActionsRow}>
             <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={handleCreateIntervention}
+              style={styles.quickActionTile}
+              onPress={() => router.push('/(app)/(technician)/Assignment')}
             >
-              <Ionicons name="add-circle" size={22} color="#6200EE" />
-              <Text style={styles.quickActionText}>New Request</Text>
+              <Ionicons name="list" size={24} color="#6200EE" />
+              <Text style={styles.tileText}>All Tasks</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={() => router.push('/(app)/(client)/support')}
+              style={styles.quickActionTile}
+              onPress={() => router.push('/(app)/(technician)/completed')}
             >
-              <Ionicons name="help-circle" size={22} color="#6200EE" />
-              <Text style={styles.quickActionText}>Get Help</Text>
+              <Ionicons name="checkmark-circle" size={24} color="#6200EE" />
+              <Text style={styles.tileText}>Completed</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={() => router.push('/(app)/(client)/(tabs)/interventions')}
+              style={styles.quickActionTile}
+              onPress={() => router.push('/(app)/(technician)/reports')}
             >
-              <Ionicons name="time" size={22} color="#6200EE" />
-              <Text style={styles.quickActionText}>History</Text>
+              <Ionicons name="document-text" size={24} color="#6200EE" />
+              <Text style={styles.tileText}>Reports</Text>
             </TouchableOpacity>
           </View>
         </View>
+        
+        {/* Status Update Modal */}
+        {statusUpdateVisible && (
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Update Status</Text>
+                <TouchableOpacity onPress={closeStatusUpdate}>
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              
+              <Text style={styles.modalSubtitle}>
+                {selectedIntervention?.title ? selectedIntervention.title : 'Intervention'}
+              </Text>
+              
+              <View style={styles.statusButtons}>
+                <TouchableOpacity 
+                  style={[styles.statusOption, styles.pendingOption]}
+                  onPress={() => updateInterventionStatus('pending')}
+                >
+                  <Ionicons name="time" size={24} color="#FF9800" />
+                  <Text style={styles.statusOptionText}>Pending</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.statusOption, styles.inProgressOption]}
+                  onPress={() => updateInterventionStatus('in progress')}
+                >
+                  <Ionicons name="construct" size={24} color="#2196F3" />
+                  <Text style={styles.statusOptionText}>In Progress</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.statusOption, styles.completedOption]}
+                  onPress={() => updateInterventionStatus('completed')}
+                >
+                  <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                  <Text style={styles.statusOptionText}>Completed</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.statusOption, styles.cancelledOption]}
+                  onPress={() => updateInterventionStatus('cancelled')}
+                >
+                  <Ionicons name="close-circle" size={24} color="#F44336" />
+                  <Text style={styles.statusOptionText}>Cancelled</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={closeStatusUpdate}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         
         {/* Bottom spacing for tab bar */}
         <View style={styles.bottomSpacing} />
@@ -241,20 +487,9 @@ export default function ClientDashboard() {
   );
 }
 
-// Helper function to get icon based on status
-const getStatusIcon = (status) => {
-  switch (status) {
-    case 'pending':
-      return 'time';
-    case 'in progress':
-      return 'construct';
-    case 'completed':
-      return 'checkmark-circle';
-    case 'cancelled':
-      return 'close-circle';
-    default:
-      return 'document-text';
-  }
+// Helper function to capitalize first letter
+const capitalizeFirstLetter = (string) => {
+  return string.charAt(0).toUpperCase() + string.slice(1);
 };
 
 // Helper function to get color based on status
@@ -291,10 +526,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
   },
-  subGreeting: {
+  availabilityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  availabilityText: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 4,
+  },
+  switch: {
+    marginLeft: 8,
+    transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }],
   },
   notificationButton: {
     width: 40,
@@ -319,10 +562,57 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  categoriesSection: {
-    padding: 16,
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginTop: 16,
+  },
+  statCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 12,
+    width: '23%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    position: 'relative',
+  },
+  statIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FF9800',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#757575',
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  statIndicator: {
+    position: 'absolute',
+    height: 4,
+    width: '100%',
+    bottom: 0,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  sectionContainer: {
     backgroundColor: 'white',
     borderRadius: 16,
+    padding: 16,
     margin: 16,
     marginBottom: 8,
     shadowColor: '#000',
@@ -341,53 +631,149 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 16,
   },
   viewAllText: {
     color: '#6200EE',
     fontWeight: '500',
   },
-  categoriesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  categoryItem: {
-    width: '30%',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  categoryIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  categoryName: {
-    fontSize: 12,
-    color: '#333',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  appointmentsSection: {
-    padding: 16,
+  assignmentCard: {
     backgroundColor: 'white',
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
-    minHeight: 150, // Ensure minimum height even when empty
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  assignmentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  assignmentStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  assignmentDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  assignmentDate: {
+    fontSize: 12,
+    color: '#757575',
+    marginLeft: 4,
+  },
+  assignmentTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  clientInfoContainer: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  clientImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 12,
+  },
+  clientImagePlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#BDBDBD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  clientDetails: {
+    flex: 1,
+  },
+  clientName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 2,
+  },
+  clientAddress: {
+    fontSize: 12,
+    color: '#757575',
+  },
+  assignmentFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    paddingTop: 12,
+  },
+  serviceTypeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  serviceTypeText: {
+    fontSize: 12,
+    color: '#6200EE',
+    marginLeft: 6,
+  },
+  assignmentActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#6200EE',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
+  statusButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'white',
+    marginLeft: 4,
+  },
+  chatButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(98, 0, 238, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  cameraButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(98, 0, 238, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
   },
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 24,
+    padding: 24,
   },
   loadingText: {
     marginTop: 8,
@@ -396,78 +782,27 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     alignItems: 'center',
-    paddingVertical: 24,
+    padding: 24,
   },
   errorText: {
     marginTop: 8,
     color: '#F44336',
     fontSize: 14,
   },
-  appointmentCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  appointmentIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F3E5F5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  appointmentDetails: {
-    flex: 1,
-  },
-  appointmentTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  appointmentTime: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  technicianName: {
-    fontSize: 12,
-    color: '#666',
-  },
-  statusIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginLeft: 8,
-  },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 24,
+    padding: 24,
   },
   emptyText: {
     marginTop: 12,
-    marginBottom: 16,
     color: '#666',
     fontSize: 16,
   },
-  createButton: {
-    backgroundColor: '#6200EE',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  createButtonText: {
-    color: 'white',
-    fontWeight: '500',
-  },
   quickActionsSection: {
-    padding: 16,
     backgroundColor: 'white',
     borderRadius: 16,
-    marginHorizontal: 16,
+    padding: 16,
+    margin: 16,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -478,22 +813,110 @@ const styles = StyleSheet.create({
   quickActionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    marginTop: 8,
   },
-  quickActionButton: {
-    flex: 1,
+  quickActionTile: {
+    width: '30%',
+    backgroundColor: 'rgba(98, 0, 238, 0.05)',
+    borderRadius: 12,
+    padding: 16,
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#F3E5F5',
-    marginHorizontal: 4,
+    marginBottom: 10,
   },
-  quickActionText: {
+  tileText: {
     marginTop: 8,
     color: '#6200EE',
     fontWeight: '500',
-    fontSize: 12,
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  modalContainer: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 16,
+  },
+  statusButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  statusOption: {
+    width: '48%',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  pendingOption: {
+    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+  },
+  inProgressOption: {
+    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+  },
+  completedOption: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+  },
+  cancelledOption: {
+    backgroundColor: 'rgba(244, 67, 54, 0.1)',
+  },
+  statusOptionText: {
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  cancelButton: {
+    padding: 12,
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+  },
+  cancelButtonText: {
+    color: '#333',
+    fontWeight: '500',
   },
   bottomSpacing: {
     height: 90, // Adjust based on tab bar height
   },
-});
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+  },
+  priorityText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  }})

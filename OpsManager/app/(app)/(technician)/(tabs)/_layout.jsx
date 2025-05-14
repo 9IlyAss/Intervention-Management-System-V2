@@ -1,13 +1,13 @@
-// app/(app)/(client)/(tabs)/_layout.jsx
+// app/(app)/(technician)/(tabs)/_layout.jsx
 import React from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-export default function ClientTabLayout() {
+export default function TechnicianTabLayout() {
   const insets = useSafeAreaInsets();
- 
+  
   return (
     <Tabs
       screenOptions={{
@@ -36,7 +36,7 @@ export default function ClientTabLayout() {
           ),
         }}
       />
-     
+      
       <Tabs.Screen
         name="chat"
         options={{
@@ -46,7 +46,7 @@ export default function ClientTabLayout() {
           ),
         }}
       />
-     
+      
       <Tabs.Screen
         name="Assignment"
         options={{
@@ -60,17 +60,17 @@ export default function ClientTabLayout() {
           ),
         }}
       />
-     
+      
       <Tabs.Screen
         name="interventions"
         options={{
           title: 'Requests',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="list" size={size} color={color} />
+            <Ionicons name="document-text" size={size} color={color} />
           ),
         }}
       />
-     
+      
       <Tabs.Screen
         name="profile"
         options={{
