@@ -220,25 +220,17 @@ Router.post('/chat/:clientId', protect, async (req, res) => {
 // @access Private (Technician)
 Router.get('/chat-room/:chatRoomId', protect, async (req, res) => {
     try {
-        // Convert the string ID to MongoDB ObjectId
-        let roomId;
-        try {
-            roomId = new ObjectId(req.params.chatRoomId);
-        } catch (error) {
-            console.error('Invalid ObjectId format:', error.message);
-            return res.status(400).json({ error: 'Invalid chat room ID format' });
-        }
-        
-        // Find the chat room by ID and make sure it belongs to the current user
         const chatRoom = await ChatRoom.findOne({
-            _id: roomId,
+            _id: req.params.chatRoomId,
             'participants.technicianId': req.user.id
         })
         .populate('participants.clientId', 'name profileImage')
         .populate('messages.senderId', 'name profileImage');
-
+        console.log("slllm", req.user.id,req.params.chatRoomId)
         if (!chatRoom) {
-            return res.status(404).json({ error: 'Chat room not found or you are not authorized to access it' });
+            return res.status(404).json({ 
+                error: 'Chat room not found or you are not authorized to access it' 
+            });
         }
 
         // Mark messages as read
@@ -249,29 +241,25 @@ Router.get('/chat-room/:chatRoomId', protect, async (req, res) => {
         });
         await chatRoom.save();
 
-        const messages = chatRoom.messages.map(msg => ({
-            senderId: msg.senderId._id,
-            senderName: msg.senderId.name,
-            senderProfileImage: msg.senderId.profileImage,
-            content: msg.content,
-            sentAt: msg.createdAt,
-            read: msg.read
-        }));
-
         res.status(200).json({
             chatRoomId: chatRoom._id,
             clientId: chatRoom.participants.clientId._id,
             clientName: chatRoom.participants.clientId.name,
-            clientProfileImage: chatRoom.participants.clientId.profileImage,
-            interventionId: chatRoom.interventionId,
-            messages
+            clientImage: chatRoom.participants.clientId.profileImage,
+            messages: chatRoom.messages.map(msg => ({
+                senderId: msg.senderId._id,
+                senderName: msg.senderId.name,
+                senderImage: msg.senderId.profileImage,
+                content: msg.content,
+                sentAt: msg.createdAt,
+                read: msg.read
+            }))
         });
     } catch (error) {
-        console.error('Error in chat-room/:chatRoomId route:', error);
+        console.error('Error in GET /chat-room/:chatRoomId route:', error);
         res.status(500).json({ error: error.message });
     }
 });
-
 // @route POST /api/technician/chat-room/:chatRoomId/message
 // @desc Send message to a chat room
 // @access Private (Technician)

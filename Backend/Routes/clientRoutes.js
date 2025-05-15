@@ -252,49 +252,50 @@ Router.post('/chat/:technicianId', protect, async (req, res) => {
 });
 
 // NEW ROUTES FOR CHAT ROOM-CENTRIC OPERATIONS
-
 // @route GET /api/client/chat-room/:chatRoomId
 // @desc Get chat by room ID
 // @access Private (Client)
 Router.get('/chat-room/:chatRoomId', protect, async (req, res) => {
     try {
-        // Convert the string ID to MongoDB ObjectId
-        let roomId;
-        try {
-            roomId = new ObjectId(req.params.chatRoomId);
-        } catch (error) {
-            console.error('Invalid ObjectId format:', error.message);
-            return res.status(400).json({ error: 'Invalid chat room ID format' });
-        }
-
-        console.log(`Looking for chat room with ID: ${roomId}`);
+        const roomId = new ObjectId(req.params.chatRoomId);
         
-        // Find the chat room by ID and make sure it belongs to the current user
         const chatRoom = await ChatRoom.findOne({
             _id: roomId,
             'participants.clientId': req.user.id
         })
-        .populate('participants.technicianId', 'name')
-        .populate('messages.senderId', 'name');
-
+        .populate('participants.technicianId', 'name profileImage')
+        .populate('messages.senderId', 'name profileImage');
+        
         if (!chatRoom) {
-            console.log('Chat room not found or not authorized');
-            return res.status(404).json({ error: 'Chat room not found or you are not authorized to access it' });
+            return res.status(404).json({
+                error: 'Chat room not found or you are not authorized to access it'
+            });
         }
-
-        const messages = chatRoom.messages.map(msg => ({
-            senderName: msg.senderId.name,
-            content: msg.content,
-            sentAt: msg.createdAt
-        }));
-
+        
+        // Mark technician messages as read
+        chatRoom.messages.forEach(msg => {
+            if (msg.senderId._id.toString() !== req.user.id) {
+                msg.read = true;
+            }
+        });
+        await chatRoom.save();
+        
         res.status(200).json({
             chatRoomId: chatRoom._id,
+            technicianId: chatRoom.participants.technicianId._id,
             technicianName: chatRoom.participants.technicianId.name,
-            messages
+            technicianImage: chatRoom.participants.technicianId.profileImage,
+            messages: chatRoom.messages.map(msg => ({
+                senderId: msg.senderId._id.toString(), // FIXED: Convert to string
+                senderName: msg.senderId.name,
+                senderImage: msg.senderId.profileImage,
+                content: msg.content,
+                sentAt: msg.createdAt,
+                read: msg.read
+            }))
         });
     } catch (error) {
-        console.error('Error in chat-room/:chatRoomId route:', error);
+        console.error('Error in GET /chat-room/:chatRoomId route:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -309,42 +310,34 @@ Router.post('/chat-room/:chatRoomId/message', protect, async (req, res) => {
         if (!message || message.trim() === '') {
             return res.status(400).json({ error: 'Message cannot be empty' });
         }
-
-        // Convert the string ID to MongoDB ObjectId
-        let roomId;
-        try {
-            roomId = new ObjectId(req.params.chatRoomId);
-        } catch (error) {
-            console.error('Invalid ObjectId format:', error.message);
-            return res.status(400).json({ error: 'Invalid chat room ID format' });
-        }
         
-        // Find the chat room and verify ownership
-        let chatRoom = await ChatRoom.findOne({
+        const roomId = new ObjectId(req.params.chatRoomId);
+        
+        const chatRoom = await ChatRoom.findOne({
             _id: roomId,
             'participants.clientId': req.user.id
         });
-
+        
         if (!chatRoom) {
-            console.log('Chat room not found or not authorized for message sending');
-            return res.status(404).json({ error: 'Chat room not found or you are not authorized to access it' });
+            return res.status(404).json({
+                error: 'Chat room not found or you are not authorized to access it'
+            });
         }
-
-        // Add the message
+        
         chatRoom.messages.push({
             senderId: req.user.id,
             content: message.trim(),
             read: false
         });
-
+        
+        chatRoom.updatedAt = Date.now();
         await chatRoom.save();
         
-        res.status(201).json({ message: "Message sent!" });
+        res.status(201).json({ message: 'Message sent!' });
     } catch (error) {
-        console.error('Error in POST chat-room/:chatRoomId/message route:', error);
+        console.error('Error in POST /chat-room/:chatRoomId/message route:', error);
         res.status(500).json({ error: error.message });
     }
 });
-
 
 module.exports = Router;

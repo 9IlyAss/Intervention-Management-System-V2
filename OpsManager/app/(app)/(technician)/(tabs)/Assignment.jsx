@@ -1,124 +1,199 @@
-// app/(app)/(client)/create.jsx
+// app/(app)/(technician)/Assignment.jsx
 import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  TextInput,
+  FlatList,
   TouchableOpacity,
-  Switch,
-  Alert,
-  StatusBar,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   Image,
+  StatusBar,
+  RefreshControl,
+  Alert,
+  Modal,
+  TextInput,
+  ScrollView
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { useAuth } from "../../../contexts/AuthContext";
-import { interventionAPI } from "../../../services/api";
+import technicianService from "../../../services/technicianService";
 import * as ImagePicker from "expo-image-picker";
 
-export default function CreateScreen() {
-  const { categoryId, categoryName } = useLocalSearchParams();
-
+export default function AssignmentScreen() {
   const { user } = useAuth();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [location, setLocation] = useState("");
-  const [preferredDate, setPreferredDate] = useState(new Date());
-  const [preferredTime, setPreferredTime] = useState("");
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [isUrgent, setIsUrgent] = useState(false);
+  const [interventions, setInterventions] = useState([]);
+  const [filteredInterventions, setFilteredInterventions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+  const [filter, setFilter] = useState("all"); // "all", "pending", "in-progress"
+  
+  // For status update modal
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedIntervention, setSelectedIntervention] = useState(null);
+  const [newStatus, setNewStatus] = useState("");
   const [photos, setPhotos] = useState([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Categories for services - matching your dashboard serviceCategories
-  const categories = [
-    { id: "1", name: "IT Services", icon: "desktop", color: "#2196F3" },
-    { id: "2", name: "Surveillance", icon: "videocam", color: "#9C27B0" },
-    { id: "3", name: "Telephony", icon: "call", color: "#4CAF50" },
-    { id: "4", name: "Printers", icon: "print", color: "#FF9800" },
-    { id: "5", name: "Software", icon: "code", color: "#F44336" },
-    { id: "6", name: "Office Supplies", icon: "briefcase", color: "#00BCD4" },
-    { id: "7", name: "Maintenance", icon: "construct", color: "#607D8B" },
-    { id: "8", name: "Alarms", icon: "notifications", color: "#E91E63" },
-    { id: "9", name: "Sound Systems", icon: "volume-high", color: "#795548" },
-  ];
-
-  // Initialize selectedCategory based on categoryId from params
-  const [selectedCategory, setSelectedCategory] = useState(null);
-
-  // Set the selected category when the component mounts or when categoryId changes
+  const [notes, setNotes] = useState("");
+  
+  // Fetch interventions on component mount
   useEffect(() => {
-    if (categoryId) {
-      const category = categories.find((cat) => cat.id === categoryId);
-      if (category) {
-        setSelectedCategory(category);
-
-        // Optionally pre-fill title based on category
-        if (categoryName && title === "") {
-          setTitle(`${categoryName} Service Request`);
-        }
-      }
+    fetchInterventions();
+  }, []);
+  
+  // Filter interventions when filter or interventions change
+  useEffect(() => {
+    filterInterventions();
+  }, [filter, interventions]);
+  
+  // Function to fetch interventions
+  const fetchInterventions = async () => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      
+      const data = await technicianService.getTechnicianInterventions();
+      
+      // Format interventions data
+      const formattedInterventions = data.map(intervention => ({
+        id: intervention._id || intervention.id,
+        title: intervention.title,
+        description: intervention.description || 'No description provided',
+        clientName: intervention.clientId?.name || 'Unknown Client',
+        clientId: intervention.clientId,
+        clientAddress: intervention.clientId?.location || 'No address provided',
+        clientPhone: intervention.clientId?.phone || 'No phone provided',
+        date: new Date(intervention.createdAt || Date.now()).toLocaleDateString(),
+        time: new Date(intervention.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        serviceType: intervention.category || 'General',
+        status: intervention.status.toLowerCase() || 'pending',
+        category: intervention.category || 'General Services',
+        location: intervention.location || 'No location provided',
+        hasAttachments: intervention.attachmentsList?.length > 0,
+        attachments: intervention.attachmentsList || []
+      }));
+      
+      setInterventions(formattedInterventions);
+    } catch (err) {
+      console.error('Failed to load interventions:', err);
+      setError('Failed to load interventions. Please try again later.');
+    } finally {
+      setIsLoading(false);
     }
-  }, [categoryId, categoryName]);
-
-  // Custom page title based on selected category
-  const pageTitle = categoryName
-    ? `New ${categoryName} Request`
-    : "New Service Request";
-
-  const validateForm = () => {
-    if (!title.trim()) {
-      Alert.alert("Required Field", "Please enter a title for your request");
-      return false;
-    }
-
-    if (!selectedCategory) {
-      Alert.alert(
-        "Required Field",
-        "Please select a category for your request"
-      );
-      return false;
-    }
-
-    if (!description.trim()) {
-      Alert.alert(
-        "Required Field",
-        "Please provide a description of the issue"
-      );
-      return false;
-    }
-
-    if (!location.trim()) {
-      Alert.alert("Required Field", "Please specify the location");
-      return false;
-    }
-
-    return true;
   };
-
+  
+  // Function to filter interventions
+  const filterInterventions = () => {
+    if (filter === "all") {
+      // Show only pending and in-progress interventions
+      setFilteredInterventions(
+        interventions.filter(item => 
+          item.status === "pending" || item.status === "in progress"
+        )
+      );
+    } else if (filter === "pending") {
+      setFilteredInterventions(
+        interventions.filter(item => item.status === "pending")
+      );
+    } else if (filter === "in-progress") {
+      setFilteredInterventions(
+        interventions.filter(item => item.status === "in progress")
+      );
+    }
+  };
+  
+  // Handle pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchInterventions();
+    setRefreshing(false);
+  };
+  
+  // Handle intervention press - open details
+  const handleInterventionPress = (intervention) => {
+    setSelectedIntervention(intervention);
+    setModalVisible(true);
+    setNewStatus(intervention.status);
+    setPhotos([]);
+    setNotes("");
+  };
+  
+  // Update intervention status
+  const updateInterventionStatus = async () => {
+    if (!selectedIntervention) return;
+    
+    // Check if attachments are required for completed or cancelled
+    if ((newStatus === "completed" || newStatus === "cancelled") && photos.length === 0) {
+      Alert.alert(
+        "Attachments Required",
+        "Please add at least one photo before marking as completed or cancelled."
+      );
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      
+      // Call API to update status
+      await technicianService.updateInterventionStatus(
+        selectedIntervention.id,
+        newStatus,
+        photos
+      );
+      
+      // Update the local state
+      const updatedInterventions = interventions.map(item => {
+        if (item.id === selectedIntervention.id) {
+          return {
+            ...item,
+            status: newStatus,
+            hasAttachments: photos.length > 0,
+            attachments: [...(item.attachments || []), ...photos]
+          };
+        }
+        return item;
+      });
+      
+      setInterventions(updatedInterventions);
+      
+      // Close modal
+      setModalVisible(false);
+      setSelectedIntervention(null);
+      
+      // Show success message
+      Alert.alert(
+        "Status Updated",
+        `Intervention status has been updated to ${newStatus}.`
+      );
+    } catch (err) {
+      console.error('Failed to update status:', err);
+      Alert.alert(
+        "Update Failed",
+        "Failed to update the intervention status. Please try again."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Pick image from gallery
   const pickImage = async () => {
-    // No permissions request is necessary for launching the image library
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 1,
     });
-
+    
     if (!result.canceled) {
       setPhotos([...photos, result.assets[0].uri]);
     }
   };
-
+  
+  // Take photo with camera
   const takePhoto = async () => {
-    // Request camera permissions
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
       Alert.alert(
@@ -127,66 +202,158 @@ export default function CreateScreen() {
       );
       return;
     }
-
+    
     let result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [4, 3],
       quality: 1,
     });
-
+    
     if (!result.canceled) {
       setPhotos([...photos, result.assets[0].uri]);
     }
   };
-
+  
+  // Remove photo
   const removePhoto = (index) => {
     setPhotos(photos.filter((_, i) => i !== index));
   };
-
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
-
-    setIsSubmitting(true);
-
-    try {
-      // This would be replaced with actual API call when implemented
-      // const response = await interventionAPI.create({
-      //   title,
-      //   description,
-      //   location,
-      //   category: selectedCategory.id,
-      //   preferredDate,
-      //   preferredTime,
-      //   isUrgent,
-      //   photos,
-      //   client: user.id,
-      // });
-
-      // Simulate API call success
-      setTimeout(() => {
-        Alert.alert(
-          "Request Submitted",
-          "Your service request has been submitted successfully. We will confirm the appointment shortly.",
-          [
-            {
-              text: "OK",
-              onPress: () => router.replace("/(app)/(client)/dashboard"),
-            },
-          ]
-        );
-        setIsSubmitting(false);
-      }, 1500);
-    } catch (error) {
-      console.error("Failed to submit request:", error);
-      Alert.alert("Error", "Failed to submit your request. Please try again.");
-      setIsSubmitting(false);
+  
+  // Open chat with client
+  const handleOpenChat = (clientId) => {
+    if (!clientId || !clientId._id) {
+      Alert.alert("Error", "Client information is not available.");
+      return;
+    }
+    
+    const chatRoomId = clientId._id; // Using client ID as chat room ID
+    const clientName = clientId.name || "Client";
+    const clientImage = clientId.profileImage || null;
+    
+    router.push({
+      pathname: `/(app)/(technician)/conversation/${chatRoomId}`,
+      params: { 
+        clientName: clientName,
+        clientImage: clientImage
+      }
+    });
+  };
+  
+  // Helper function to get status color
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'pending':
+        return '#FF9800'; // Orange
+      case 'in progress':
+        return '#2196F3'; // Blue
+      case 'completed':
+        return '#4CAF50'; // Green
+      case 'cancelled':
+        return '#F44336'; // Red
+      default:
+        return '#757575'; // Grey
+    }
+  };
+  
+  // Helper function to get category icon
+  const getCategoryIcon = (category) => {
+    if (!category) return 'construct';
+    
+    switch (category.toLowerCase()) {
+      case 'it services':
+        return 'desktop-outline';
+      case 'surveillance':
+        return 'videocam';
+      case 'telephony':
+        return 'call';
+      case 'printers':
+        return 'print';
+      case 'software':
+        return 'code-slash';
+      case 'office supplies':
+        return 'briefcase';
+      case 'maintenance':
+        return 'hammer';
+      case 'alarms':
+        return 'notifications';
+      case 'sound systems':
+        return 'volume-high';
+      default:
+        return 'construct';
     }
   };
 
+  // Render intervention item
+  const renderInterventionItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.interventionCard}
+      onPress={() => handleInterventionPress(item)}
+    >
+      <View style={styles.interventionHeader}>
+        <View style={styles.interventionStatus}>
+          <View 
+            style={[
+              styles.statusDot, 
+              { backgroundColor: getStatusColor(item.status) }
+            ]} 
+          />
+          <Text style={[
+            styles.statusText, 
+            { color: getStatusColor(item.status) }
+          ]}>
+            {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+          </Text>
+        </View>
+        
+        <View style={styles.interventionDateContainer}>
+          <Ionicons name="calendar" size={14} color="#757575" />
+          <Text style={styles.interventionDate}>{item.date} · {item.time}</Text>
+        </View>
+      </View>
+      
+      <Text style={styles.interventionTitle}>{item.title}</Text>
+      
+      <View style={styles.clientInfoContainer}>
+        {item.clientId?.profileImage ? (
+          <Image source={{ uri: item.clientId.profileImage }} style={styles.clientImage} />
+        ) : (
+          <View style={styles.clientImagePlaceholder}>
+            <Ionicons name="person" size={16} color="#FFFFFF" />
+          </View>
+        )}
+        <View style={styles.clientDetails}>
+          <Text style={styles.clientName}>{item.clientName}</Text>
+          <Text style={styles.clientAddress} numberOfLines={1}>{item.location || item.clientAddress}</Text>
+        </View>
+      </View>
+      
+      <View style={styles.interventionFooter}>
+        <View style={styles.categoryContainer}>
+          <Ionicons 
+            name={getCategoryIcon(item.category)} 
+            size={14} 
+            color="#6200EE" 
+          />
+          <Text style={styles.categoryText}>{item.category}</Text>
+        </View>
+        
+        <View style={styles.interventionActions}>
+          <TouchableOpacity 
+            style={styles.chatButton}
+            onPress={() => handleOpenChat(item.clientId)}
+          >
+            <Ionicons name="chatbubble" size={16} color="#6200EE" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-
+      <StatusBar barStyle="dark-content" />
+      
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -194,178 +361,327 @@ export default function CreateScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{pageTitle}</Text>
-        <View style={{ width: 24 }} /> {/* Empty view for alignment */}
+        <Text style={styles.headerTitle}>My Assignments</Text>
+        <View style={{ width: 40 }} /> {/* For alignment */}
       </View>
-
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.keyboardAvoidingView}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
-      >
-        <ScrollView
-          style={styles.content}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
+      
+      {/* Filter Tabs */}
+      <View style={styles.filterTabsContainer}>
+        <TouchableOpacity
+          style={[
+            styles.filterTab,
+            filter === "all" && styles.activeFilterTab
+          ]}
+          onPress={() => setFilter("all")}
         >
-          <View style={styles.formSection}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Title</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Enter a title for your request"
-                value={title}
-                onChangeText={setTitle}
-                maxLength={50}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Category</Text>
-              <View style={styles.categoriesContainer}>
-               {categories.map((category) => (
-  <TouchableOpacity
-    key={category.id}
-    style={[
-      styles.categoryChip,
-      selectedCategory?.id === category.id && {
-        backgroundColor: `${category.color}20`,
-        borderColor: category.color,
-      },
-    ]}
-    onPress={() => setSelectedCategory(category)}
-  >
-    <Ionicons
-      name={category.icon}
-      size={28}
-      color={
-        selectedCategory?.id === category.id
-          ? category.color
-          : "#666"
-      }
-      style={styles.categoryIcon}
-    />
-    <Text
-      style={[
-        styles.categoryText,
-        selectedCategory?.id === category.id && {
-          color: category.color,
-          fontWeight: "600",
-        },
-      ]}
-      numberOfLines={1}
-    >
-      {category.name}
-    </Text>
-  </TouchableOpacity>
-))}
-              </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Description</Text>
-              <TextInput
-                style={[styles.textInput, styles.textArea]}
-                placeholder="Describe the issue in detail"
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Location</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Enter the location (e.g., Office, Room 101)"
-                value={location}
-                onChangeText={setLocation}
-              />
-            </View>
-
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Photos (Optional)</Text>
-              <View style={styles.photosContainer}>
-                {photos.map((photo, index) => (
-                  <View key={index} style={styles.photoPreview}>
-                    <Image source={{ uri: photo }} style={styles.photoImage} />
-                    <TouchableOpacity
-                      style={styles.removePhotoButton}
-                      onPress={() => removePhoto(index)}
-                    >
-                      <Ionicons name="close-circle" size={22} color="#F44336" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-
-                <View style={styles.photoButtons}>
-                  <TouchableOpacity
-                    style={styles.photoButton}
-                    onPress={pickImage}
-                  >
-                    <Ionicons name="image-outline" size={24} color="#6200EE" />
-                    <Text style={styles.photoButtonText}>Gallery</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.photoButton}
-                    onPress={takePhoto}
-                  >
-                    <Ionicons name="camera-outline" size={24} color="#6200EE" />
-                    <Text style={styles.photoButtonText}>Camera</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.switchContainer}>
-              <View style={styles.switchLabelContainer}>
-                <Ionicons
-                  name="alert-circle-outline"
-                  size={20}
-                  color="#F44336"
-                />
-                <Text style={styles.switchLabel}>Mark as Urgent</Text>
-              </View>
-              <Switch
-                value={isUrgent}
-                onValueChange={setIsUrgent}
-                trackColor={{ false: "#D0D0D0", true: "#E8A7A7" }}
-                thumbColor={isUrgent ? "#F44336" : "#F0F0F0"}
-              />
-            </View>
-
-            {isUrgent && (
-              <View style={styles.urgentNoteContainer}>
-                <Text style={styles.urgentNoteText}>
-                  Marking as urgent may incur additional charges depending on
-                  the service.
-                </Text>
-              </View>
-            )}
-          </View>
-
+          <Text style={[
+            styles.filterTabText,
+            filter === "all" && styles.activeFilterTabText
+          ]}>
+            All Active
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[
+            styles.filterTab,
+            filter === "pending" && styles.activeFilterTab
+          ]}
+          onPress={() => setFilter("pending")}
+        >
+          <Text style={[
+            styles.filterTabText,
+            filter === "pending" && styles.activeFilterTabText
+          ]}>
+            Pending
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[
+            styles.filterTab,
+            filter === "in-progress" && styles.activeFilterTab
+          ]}
+          onPress={() => setFilter("in-progress")}
+        >
+          <Text style={[
+            styles.filterTabText,
+            filter === "in-progress" && styles.activeFilterTabText
+          ]}>
+            In Progress
+          </Text>
+        </TouchableOpacity>
+      </View>
+      
+      {/* Intervention List */}
+      {isLoading && !refreshing ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6200EE" />
+          <Text style={styles.loadingText}>Loading assignments...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color="#F44336" />
+          <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity
-            style={[
-              styles.submitButton,
-              isSubmitting && styles.submitButtonDisabled,
-            ]}
-            onPress={handleSubmit}
-            disabled={isSubmitting}
+            style={styles.retryButton}
+            onPress={fetchInterventions}
           >
-            {isSubmitting ? (
-              <Text style={styles.submitButtonText}>Submitting...</Text>
-            ) : (
-              <Text style={styles.submitButtonText}>Submit Request</Text>
-            )}
+            <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
-
-          <View style={styles.bottomSpacing} />
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </View>
+      ) : filteredInterventions.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="clipboard-outline" size={64} color="#BDBDBD" />
+          <Text style={styles.emptyText}>No active assignments found</Text>
+          <Text style={styles.emptySubText}>
+            When you get new assignments, they will appear here
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredInterventions}
+          renderItem={renderInterventionItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#6200EE"]} />
+          }
+        />
+      )}
+      
+      {/* Intervention Detail Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Intervention Details</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalBody}>
+              {selectedIntervention && (
+                <>
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>Status</Text>
+                    <View style={styles.statusChipContainer}>
+                      <TouchableOpacity
+                        style={[
+                          styles.statusChip,
+                          newStatus === "pending" && { backgroundColor: "#FFF8E1", borderColor: "#FF9800" }
+                        ]}
+                        onPress={() => setNewStatus("pending")}
+                      >
+                        <Text style={[
+                          styles.statusChipText,
+                          newStatus === "pending" && { color: "#FF9800" }
+                        ]}>
+                          Pending
+                        </Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity
+                        style={[
+                          styles.statusChip,
+                          newStatus === "in progress" && { backgroundColor: "#E3F2FD", borderColor: "#2196F3" }
+                        ]}
+                        onPress={() => setNewStatus("in progress")}
+                      >
+                        <Text style={[
+                          styles.statusChipText,
+                          newStatus === "in progress" && { color: "#2196F3" }
+                        ]}>
+                          In Progress
+                        </Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity
+                        style={[
+                          styles.statusChip,
+                          newStatus === "completed" && { backgroundColor: "#E8F5E9", borderColor: "#4CAF50" }
+                        ]}
+                        onPress={() => setNewStatus("completed")}
+                      >
+                        <Text style={[
+                          styles.statusChipText,
+                          newStatus === "completed" && { color: "#4CAF50" }
+                        ]}>
+                          Completed
+                        </Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity
+                        style={[
+                          styles.statusChip,
+                          newStatus === "cancelled" && { backgroundColor: "#FFEBEE", borderColor: "#F44336" }
+                        ]}
+                        onPress={() => setNewStatus("cancelled")}
+                      >
+                        <Text style={[
+                          styles.statusChipText,
+                          newStatus === "cancelled" && { color: "#F44336" }
+                        ]}>
+                          Cancelled
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>Title</Text>
+                    <Text style={styles.detailValue}>{selectedIntervention.title}</Text>
+                  </View>
+                  
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>Description</Text>
+                    <Text style={styles.detailValue}>{selectedIntervention.description}</Text>
+                  </View>
+                  
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>Category</Text>
+                    <View style={styles.detailRow}>
+                      <Ionicons 
+                        name={getCategoryIcon(selectedIntervention.category)} 
+                        size={16} 
+                        color="#6200EE" 
+                      />
+                      <Text style={[styles.detailValue, { marginLeft: 8 }]}>
+                        {selectedIntervention.category}
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>Location</Text>
+                    <Text style={styles.detailValue}>{selectedIntervention.location}</Text>
+                  </View>
+                  
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>Client</Text>
+                    <View style={styles.clientRow}>
+                      {selectedIntervention.clientId?.profileImage ? (
+                        <Image 
+                          source={{ uri: selectedIntervention.clientId.profileImage }} 
+                          style={styles.detailClientImage} 
+                        />
+                      ) : (
+                        <View style={styles.detailClientImagePlaceholder}>
+                          <Ionicons name="person" size={16} color="#FFFFFF" />
+                        </View>
+                      )}
+                      <View style={styles.clientInfo}>
+                        <Text style={styles.clientNameDetail}>{selectedIntervention.clientName}</Text>
+                        <Text style={styles.clientContact}>{selectedIntervention.clientPhone}</Text>
+                        <Text style={styles.clientContact}>{selectedIntervention.clientAddress}</Text>
+                      </View>
+                    </View>
+                  </View>
+                  
+                  {/* Existing Attachments */}
+                  {selectedIntervention.hasAttachments && (
+                    <View style={styles.detailSection}>
+                      <Text style={styles.detailLabel}>Existing Attachments</Text>
+                      <View style={styles.attachmentsContainer}>
+                        {selectedIntervention.attachments.map((attachment, index) => (
+                          <View key={index} style={styles.attachmentItem}>
+                            <Image source={{ uri: attachment }} style={styles.attachmentThumbnail} />
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                  
+                  {(newStatus === "completed" || newStatus === "cancelled") && (
+                    <View style={styles.detailSection}>
+                      <Text style={styles.detailLabel}>
+                        Add Photos
+                        <Text style={styles.requiredText}> (Required)</Text>
+                      </Text>
+                      <View style={styles.photoContainer}>
+                        {photos.map((photo, index) => (
+                          <View key={index} style={styles.photoPreview}>
+                            <Image source={{ uri: photo }} style={styles.photoImage} />
+                            <TouchableOpacity
+                              style={styles.removePhotoButton}
+                              onPress={() => removePhoto(index)}
+                            >
+                              <Ionicons name="close-circle" size={22} color="#F44336" />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                        
+                        <View style={styles.photoButtons}>
+                          <TouchableOpacity
+                            style={styles.photoButton}
+                            onPress={pickImage}
+                          >
+                            <Ionicons name="image-outline" size={24} color="#6200EE" />
+                            <Text style={styles.photoButtonText}>Gallery</Text>
+                          </TouchableOpacity>
+                          
+                          <TouchableOpacity
+                            style={styles.photoButton}
+                            onPress={takePhoto}
+                          >
+                            <Ionicons name="camera-outline" size={24} color="#6200EE" />
+                            <Text style={styles.photoButtonText}>Camera</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+                  
+                  {/* Notes - Optional */}
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>Notes (Optional)</Text>
+                    <TextInput
+                      style={styles.notesInput}
+                      placeholder="Add any notes about this intervention..."
+                      value={notes}
+                      onChangeText={setNotes}
+                      multiline
+                      numberOfLines={4}
+                      textAlignVertical="top"
+                    />
+                  </View>
+                </>
+              )}
+            </ScrollView>
+            
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.updateButton}
+                onPress={updateInterventionStatus}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.updateButtonText}>Update Status</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -397,123 +713,363 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333",
   },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  formSection: {
+  filterTabsContainer: {
+    flexDirection: "row",
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  filterTab: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginRight: 12,
+    borderRadius: 20,
+    backgroundColor: "#F5F7FA",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  activeFilterTab: {
+    backgroundColor: "#EDE7F6",
+    borderColor: "#6200EE",
+  },
+  filterTabText: {
+    fontSize: 14,
+    color: "#757575",
+    fontWeight: "500",
+  },
+  activeFilterTabText: {
+    color: "#6200EE",
+    fontWeight: "600",
+  },
+  list: {
     padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    paddingBottom: 100, // Extra space for tab bar
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: "#757575",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  errorText: {
+    marginTop: 16,
     marginBottom: 24,
+    fontSize: 16,
+    color: "#F44336",
+    textAlign: "center",
   },
-  inputContainer: {
-    marginBottom: 20,
+  retryButton: {
+    backgroundColor: "#6200EE",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
   },
-  inputLabel: {
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+  },
+  emptySubText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#757575",
+    textAlign: "center",
+  },
+  interventionCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  interventionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  interventionStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  interventionDateContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  interventionDate: {
+    fontSize: 12,
+    color: "#757575",
+    marginLeft: 4,
+  },
+  interventionTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: "#333",
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  textInput: {
-    backgroundColor: "#F5F7FA",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
+  clientInfoContainer: {
+    flexDirection: "row",
+    marginBottom: 12,
+  },
+  clientImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  clientImagePlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#BDBDBD",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  clientDetails: {
+    flex: 1,
+  },
+  clientName: {
+    fontSize: 14,
+    fontWeight: "500",
     color: "#333",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
+    marginBottom: 2,
   },
-  textArea: {
-    minHeight: 100,
+  clientAddress: {
+    fontSize: 12,
+    color: "#757575",
+  },
+  interventionFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
     paddingTop: 12,
   },
-  categoriesContainer: {
+  categoryContainer: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between", // This creates equal spacing
-  },
-  categoryChip: {
-    flexDirection: "column", // Change to column for better layout of long names
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F5F7FA",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    width: "32%", // Just under 1/3 to allow for proper spacing
-    height: 80, // Fixed height for consistency
-  },
-  categoryIcon: {
-    marginBottom: 8, // Add space between icon and text
-    fontSize: 24, // Larger icon
   },
   categoryText: {
     fontSize: 12,
-    color: "#666",
-    textAlign: "center", // Center text
+    color: "#6200EE",
+    marginLeft: 8,
     fontWeight: "500",
   },
-  dateTimeContainer: {
+  interventionActions: {
+    flexDirection: "row",
+  },
+  chatButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(98, 0, 238, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    height: "90%",
+  },
+  modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
   },
-  dateInput: {
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBody: {
     flex: 1,
+    padding: 20,
+  },
+  modalFooter: {
     flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F5F7FA",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    justifyContent: "space-between",
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
+  },
+  cancelButton: {
+    flex: 1,
+    height: 48,
     marginRight: 8,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-  timeInput: {
-    width: "40%",
-    flexDirection: "row",
+    borderRadius: 24,
+    justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F5F7FA",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
+    backgroundColor: "#F5F5F5",
   },
-  dateTimeIcon: {
-    marginRight: 8,
+  cancelButtonText: {
+    color: "#333",
+    fontSize: 16,
+    fontWeight: "600",
   },
-  dateTimeText: {
+  updateButton: {
+    flex: 2,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#6200EE",
+  },
+  updateButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  detailSection: {
+    marginBottom: 20,
+  },
+  detailLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#757575",
+    marginBottom: 8,
+  },
+  detailValue: {
     fontSize: 16,
     color: "#333",
   },
-  photosContainer: {
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  statusChipContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 8,
+  },
+  statusChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    backgroundColor: "#F5F7FA",
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  statusChipText: {
+    fontSize: 14,
+    color: "#757575",
+    fontWeight: "500",
+  },
+  clientRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  detailClientImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 16,
+  },
+  detailClientImagePlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#BDBDBD",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  clientInfo: {
+    flex: 1,
+  },
+  clientNameDetail: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+  },
+  clientContact: {
+    fontSize: 14,
+    color: "#757575",
+    marginBottom: 2,
+  },
+  notesInput: {
+    minHeight: 100,
+    backgroundColor: "#F5F7FA",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    padding: 12,
+    fontSize: 16,
+    color: "#333",
+  },
+  requiredText: {
+    color: "#F44336",
+    fontWeight: "normal",
+  },
+  photoContainer: {
     marginTop: 8,
   },
   photoPreview: {
-    position: "relative",
     width: "100%",
     height: 200,
-    marginBottom: 12,
     borderRadius: 8,
+    marginBottom: 16,
+    position: "relative",
     overflow: "hidden",
-    backgroundColor: "#F5F7FA",
   },
   photoImage: {
     width: "100%",
@@ -524,10 +1080,10 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 8,
     right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: "rgba(255, 255, 255, 0.8)",
-    borderRadius: 15,
-    width: 30,
-    height: 30,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -537,11 +1093,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   photoButton: {
+    flex: 1,
     alignItems: "center",
     paddingVertical: 12,
-    paddingHorizontal: 24,
     borderRadius: 8,
     backgroundColor: "#F3E5F5",
+    marginHorizontal: 8,
   },
   photoButtonText: {
     marginTop: 8,
@@ -549,50 +1106,22 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#6200EE",
   },
-  switchContainer: {
+  attachmentsContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  switchLabelContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  switchLabel: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#333",
-    marginLeft: 8,
-  },
-  urgentNoteContainer: {
-    backgroundColor: "#FEF5F5",
-    borderRadius: 8,
-    padding: 12,
+    flexWrap: "wrap",
     marginTop: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: "#F44336",
   },
-  urgentNoteText: {
-    fontSize: 14,
-    color: "#F44336",
-  },
-  submitButton: {
-    height: 56,
-    borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#6200EE",
-  },
-  submitButtonDisabled: {
-    backgroundColor: "#B794F6",
-  },
-  submitButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-  bottomSpacing: {
-    height: 100, // Extra space for tab bar
+  attachmentItem: {
+  width: 80,
+  height: 80,
+  borderRadius: 8, 
+  overflow: "hidden",
+  marginRight: 8,
+  marginBottom: 8,
+},
+  attachmentThumbnail: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
   },
 });

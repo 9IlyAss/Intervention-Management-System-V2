@@ -1,4 +1,4 @@
-// app/(app)/(client)/chat.jsx
+// app/(app)/(technician)/chat.jsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -7,8 +7,6 @@ import {
   FlatList,
   TextInput,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
   StatusBar,
   Image,
   ActivityIndicator,
@@ -18,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../contexts/AuthContext';
 import { router } from 'expo-router';
-import clientService from '../../../services/clientService';
+import technicianService from '../../../services/technicianService';
 
 export default function ChatListScreen() {
   const { user } = useAuth();
@@ -39,7 +37,7 @@ export default function ChatListScreen() {
       setError(null);
       setIsLoading(true);
       
-      const data = await clientService.getChatRooms();
+      const data = await technicianService.getChatRooms();
       
       // Format the data for display
       const formattedChatRooms = data.map(room => {
@@ -48,8 +46,8 @@ export default function ChatListScreen() {
         
         return {
           id: room.chatRoomId || `chat-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-          name: room.clientName, // In this case it's the technician name
-          avatar: null,
+          name: room.clientName, // Client name
+          avatar: room.clientProfileImage,
           lastMessage: lastMessage,
           timestamp: new Date(),
           unread: 0, // You would get this from the API in a real app
@@ -65,7 +63,7 @@ export default function ChatListScreen() {
     }
   };
 
-  // Handle pull-to-refresh (would be implemented in a FlatList)
+  // Handle pull-to-refresh
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchChatRooms();
@@ -95,10 +93,10 @@ export default function ChatListScreen() {
   };
 
   // Navigate to conversation screen
-  const goToChat = (chatId, technicianName) => {
+  const goToChat = (chatId, clientName, clientImage) => {
     router.push({
-      pathname: `/(app)/(client)/conversation/${chatId}`,
-      params: { technicianName }
+      pathname: `/(app)/(technician)/conversation/${chatId}`,
+      params: { clientName, clientImage }
     });
   };
 
@@ -106,21 +104,21 @@ export default function ChatListScreen() {
   const renderChatItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.chatItem}
-      onPress={() => goToChat(item.id, item.name)}
+      onPress={() => goToChat(item.id, item.name, item.avatar)}
     >
       <View style={styles.avatarContainer}>
         {item.avatar ? (
           <Image source={{ uri: item.avatar }} style={styles.avatar} />
         ) : (
           <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarText}>{item.name?.[0] || 'T'}</Text>
+            <Text style={styles.avatarText}>{item.name?.[0] || 'C'}</Text>
           </View>
         )}
       </View>
       
       <View style={styles.chatInfo}>
         <View style={styles.chatHeader}>
-          <Text style={styles.chatName}>{item.name}</Text>
+          <Text style={styles.chatName} numberOfLines={1}>{item.name}</Text>
           <Text style={styles.chatTime}>{formatTimestamp(item.timestamp)}</Text>
         </View>
         
@@ -165,9 +163,9 @@ export default function ChatListScreen() {
           <Text style={styles.emptyText}>No conversations yet</Text>
           <TouchableOpacity 
             style={styles.newChatButton} 
-            onPress={() => router.push('/(app)/(client)/support')}
+            onPress={() => router.push('/(app)/(technician)/clients')}
           >
-            <Text style={styles.newChatButtonText}>Contact Support</Text>
+            <Text style={styles.newChatButtonText}>View Clients</Text>
           </TouchableOpacity>
         </>
       )}
@@ -180,6 +178,17 @@ export default function ChatListScreen() {
       
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Messages</Text>
+        <TouchableOpacity 
+          style={styles.refreshButton}
+          onPress={handleRefresh}
+          disabled={isLoading || refreshing}
+        >
+          {refreshing ? (
+            <ActivityIndicator size="small" color="#6200EE" />
+          ) : (
+            <Ionicons name="refresh" size={22} color="#6200EE" />
+          )}
+        </TouchableOpacity>
       </View>
       
       <View style={styles.searchContainer}>
@@ -189,9 +198,13 @@ export default function ChatListScreen() {
           placeholder="Search conversations..."
           value={searchQuery}
           onChangeText={setSearchQuery}
+          placeholderTextColor="#999"
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
+          <TouchableOpacity 
+            style={styles.clearButton}
+            onPress={() => setSearchQuery('')}
+          >
             <Ionicons name="close-circle" size={20} color="#999" />
           </TouchableOpacity>
         )}
@@ -220,16 +233,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F7FA',
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: 'bold',
     color: '#333',
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -239,6 +267,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
   },
   searchIcon: {
     marginRight: 8,
@@ -248,6 +281,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     height: 40,
+  },
+  clearButton: {
+    padding: 8,
   },
   chatList: {
     padding: 16,
@@ -261,34 +297,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
+    padding: 14,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
     elevation: 1,
   },
   avatarContainer: {
-    marginRight: 12,
+    marginRight: 14,
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   avatarPlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#E0E0E0',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#6200EE',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#666',
+    color: '#FFFFFF',
   },
   chatInfo: {
     flex: 1,
@@ -301,9 +337,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   chatName: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
     color: '#333',
+    flex: 1,
+    marginRight: 8,
   },
   chatTime: {
     fontSize: 12,
@@ -319,6 +357,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginRight: 8,
+    lineHeight: 20,
   },
   unreadBadge: {
     backgroundColor: '#6200EE',
@@ -341,32 +380,43 @@ const styles = StyleSheet.create({
     marginTop: 60,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#666',
     marginTop: 16,
     marginBottom: 24,
     textAlign: 'center',
+    fontWeight: '500',
   },
   newChatButton: {
+    backgroundColor: '#6200EE',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  newChatButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  retryButton: {
     backgroundColor: '#6200EE',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
-  },
-  newChatButtonText: {
-    color: 'white',
-    fontWeight: '500',
-    fontSize: 14,
-  },
-  retryButton: {
-    backgroundColor: '#F44336',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   retryButtonText: {
     color: 'white',
-    fontWeight: '500',
+    fontWeight: '600',
     fontSize: 14,
   },
 });

@@ -31,8 +31,6 @@ export default function TechnicianDashboard() {
   });
   const [isAvailable, setIsAvailable] = useState(true);
   const [error, setError] = useState(null);
-  const [statusUpdateVisible, setStatusUpdateVisible] = useState(false);
-  const [selectedIntervention, setSelectedIntervention] = useState(null);
   
   // Load interventions on component mount
   useEffect(() => {
@@ -54,6 +52,7 @@ export default function TechnicianDashboard() {
         title: intervention.title,
         description: intervention.description || 'No description provided',
         clientName: intervention.clientId?.name || 'Unknown Client',
+        clientId :  intervention.clientId,
         clientAddress: intervention.clientId?.location || 'No address provided',
         clientPhone: intervention.clientId?.phone || 'No phone provided',
         date: new Date(intervention.scheduledDate || intervention.createdAt || Date.now()).toLocaleDateString(),
@@ -119,60 +118,10 @@ export default function TechnicianDashboard() {
 
   // Navigate to client chat
   const handleOpenChat = (interventionId) => {
-    router.push(`/(app)/(technician)/chat/${interventionId}`);
-  };
-
-  // Navigate to update intervention status
-  const handleUpdateStatus = (intervention) => {
-    setSelectedIntervention(intervention);
-    setStatusUpdateVisible(true);
-  };
-  
-  // Close status update modal
-  const closeStatusUpdate = () => {
-    setStatusUpdateVisible(false);
-    setSelectedIntervention(null);
-  };
-  
-  // Update intervention status
-  const updateInterventionStatus = async (newStatus) => {
-    try {
-      if (!selectedIntervention) return;
-      
-      // Format status to match backend enum (capitalize first letter)
-      const formattedStatus = capitalizeFirstLetter(newStatus);
-      
-      // Call API to update status
-      await technicianService.updateInterventionStatus(selectedIntervention.id, formattedStatus);
-      
-      // Update local state to reflect the change
-      const updatedInterventions = interventions.map(item => 
-        item.id === selectedIntervention.id 
-          ? { ...item, status: newStatus.toLowerCase() } 
-          : item
-      );
-      
-      setInterventions(updatedInterventions);
-      
-      // Recalculate stats
-      const completedCount = updatedInterventions.filter(i => i.status === 'completed').length;
-      const inProgressCount = updatedInterventions.filter(i => i.status === 'in progress').length;
-      const pendingCount = updatedInterventions.filter(i => i.status === 'pending').length;
-      const cancelledCount = updatedInterventions.filter(i => i.status === 'cancelled').length;
-      
-      setStats({
-        completed: completedCount,
-        inProgress: inProgressCount,
-        pending: pendingCount,
-        cancelled: cancelledCount
-      });
-      
-      // Close modal
-      closeStatusUpdate();
-    } catch (err) {
-      console.error('Failed to update status:', err);
-      setError('Failed to update intervention status.');
-    }
+    router.push(
+      {pathname: `/(app)/(technician)/conversation/${interventionId}`,
+      params: { clientName, clientImage }}
+    );
   };
 
   // Helper function to get icon for category
@@ -356,29 +305,14 @@ export default function TechnicianDashboard() {
                   </View>
                   
                   <View style={styles.assignmentActions}>
-                    <TouchableOpacity 
-                      style={styles.statusButton}
-                      onPress={() => handleUpdateStatus(item)}
-                    >
-                      <Ionicons name="sync" size={16} color="white" />
-                      <Text style={styles.statusButtonText}>Status</Text>
-                    </TouchableOpacity>
-                    
                     {item.hasChat && (
                       <TouchableOpacity 
                         style={styles.chatButton}
-                        onPress={() => handleOpenChat(item.id)}
+                        onPress={() => handleOpenChat(item.clientId)}
                       >
                         <Ionicons name="chatbubble" size={16} color="#6200EE" />
                       </TouchableOpacity>
                     )}
-                    
-                    <TouchableOpacity 
-                      style={styles.cameraButton}
-                      onPress={() => router.push(`/(app)/(technician)/capture/${item.id}`)}
-                    >
-                      <Ionicons name="camera" size={16} color="#6200EE" />
-                    </TouchableOpacity>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -420,65 +354,6 @@ export default function TechnicianDashboard() {
             </TouchableOpacity>
           </View>
         </View>
-        
-        {/* Status Update Modal */}
-        {statusUpdateVisible && (
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Update Status</Text>
-                <TouchableOpacity onPress={closeStatusUpdate}>
-                  <Ionicons name="close" size={24} color="#333" />
-                </TouchableOpacity>
-              </View>
-              
-              <Text style={styles.modalSubtitle}>
-                {selectedIntervention?.title ? selectedIntervention.title : 'Intervention'}
-              </Text>
-              
-              <View style={styles.statusButtons}>
-                <TouchableOpacity 
-                  style={[styles.statusOption, styles.pendingOption]}
-                  onPress={() => updateInterventionStatus('pending')}
-                >
-                  <Ionicons name="time" size={24} color="#FF9800" />
-                  <Text style={styles.statusOptionText}>Pending</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.statusOption, styles.inProgressOption]}
-                  onPress={() => updateInterventionStatus('in progress')}
-                >
-                  <Ionicons name="construct" size={24} color="#2196F3" />
-                  <Text style={styles.statusOptionText}>In Progress</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.statusOption, styles.completedOption]}
-                  onPress={() => updateInterventionStatus('completed')}
-                >
-                  <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-                  <Text style={styles.statusOptionText}>Completed</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.statusOption, styles.cancelledOption]}
-                  onPress={() => updateInterventionStatus('cancelled')}
-                >
-                  <Ionicons name="close-circle" size={24} color="#F44336" />
-                  <Text style={styles.statusOptionText}>Cancelled</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <TouchableOpacity 
-                style={styles.cancelButton}
-                onPress={closeStatusUpdate}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
         
         {/* Bottom spacing for tab bar */}
         <View style={styles.bottomSpacing} />
@@ -738,20 +613,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  statusButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#6200EE',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-  },
-  statusButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: 'white',
-    marginLeft: 4,
-  },
   chatButton: {
     width: 32,
     height: 32,
@@ -759,16 +620,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(98, 0, 238, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
-  },
-  cameraButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(98, 0, 238, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
   },
   loadingContainer: {
     alignItems: 'center',
@@ -829,83 +680,6 @@ const styles = StyleSheet.create({
     color: '#6200EE',
     fontWeight: '500',
   },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  modalContainer: {
-    width: '80%',
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  modalSubtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 16,
-  },
-  statusButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  statusOption: {
-    width: '48%',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  pendingOption: {
-    backgroundColor: 'rgba(255, 152, 0, 0.1)',
-  },
-  inProgressOption: {
-    backgroundColor: 'rgba(33, 150, 243, 0.1)',
-  },
-  completedOption: {
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-  },
-  cancelledOption: {
-    backgroundColor: 'rgba(244, 67, 54, 0.1)',
-  },
-  statusOptionText: {
-    fontWeight: '500',
-    marginTop: 8,
-  },
-  cancelButton: {
-    padding: 12,
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-  },
-  cancelButtonText: {
-    color: '#333',
-    fontWeight: '500',
-  },
   bottomSpacing: {
     height: 90, // Adjust based on tab bar height
   },
@@ -919,4 +693,5 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 10,
     fontWeight: 'bold',
-  }})
+  }
+})

@@ -69,9 +69,9 @@ const technicianService = {
       throw error;
     }
   },
-
+ 
   // Get chat list for technician
-  getTechnicianChatList: async () => {
+  getChatRooms: async () => {
     try {
       log('Getting technician chat rooms...');
       const config = await getConfig();
@@ -100,15 +100,15 @@ const technicianService = {
   // Get chat history by chat room ID
   getChatByRoomId: async (chatRoomId) => {
     try {
-      log(`Getting chat room ID: ${chatRoomId}`);
-      const config = await getConfig();
-      const response = await api.get(`/api/technician/chat-room/${chatRoomId}`, config);
-      return response.data;
+        log(`Getting chat room ID: ${chatRoomId}`);
+        const config = await getConfig();
+        const response = await api.get(`/api/technician/chat-room/${chatRoomId}`, config);
+        return response.data;
     } catch (error) {
-      log(`Failed to get chat room: ${error.response?.data || error.message}`);
-      throw error;
+        log(`Failed to get chat room: ${error.response?.data || error.message}`);
+        throw error;
     }
-  },
+},
 
   // Send message to client by client ID
   sendMessageToClient: async (clientId, message) => {

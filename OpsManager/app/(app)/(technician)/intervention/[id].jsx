@@ -1,4 +1,4 @@
-// app/(app)/(client)/intervention/[id].jsx - Complete with full styles
+// app/(app)/(technician)/intervention/[id].jsx - Complete with full styles
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -14,7 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
-import clientService from '../../../services/clientService';
+import technicianService from '../../../services/technicianService';
+import ImageViewer from '../../../(shared)/ImageViewer';
 
 export default function InterventionDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -41,7 +42,7 @@ export default function InterventionDetailScreen() {
     setError(null);
     
     try {
-      const data = await clientService.getInterventionDetails(id);
+      const data = await technicianService.getInterventionDetails(id);
       setIntervention(data);
     } catch (error) {
       console.error('Failed to load intervention details:', error);
@@ -67,7 +68,7 @@ export default function InterventionDetailScreen() {
     setIsSubmitting(true);
     
     try {
-      await clientService.submitFeedback(id, {
+      await technicianService.submitFeedback(id, {
         rating,
         comment
       });
@@ -419,7 +420,7 @@ export default function InterventionDetailScreen() {
                         onPress={() => {
                           if (isImage) {
                             // Navigate to image viewer with the image URL
-                            router.push(`/(app)/(client)/ImageViewer?url=${encodeURIComponent(attachment)}`);
+                            router.push(`/(app)/(technician)/ImageViewer?url=${encodeURIComponent(attachment)}`);
                           } else {
                             // Handle non-image attachments
                             Alert.alert('View Attachment', `Opening ${attachment}...`);

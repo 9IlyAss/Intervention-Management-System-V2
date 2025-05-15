@@ -7,8 +7,6 @@ import {
   FlatList,
   TextInput,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
   StatusBar,
   Image,
   ActivityIndicator,
@@ -65,7 +63,7 @@ export default function ChatListScreen() {
     }
   };
 
-  // Handle pull-to-refresh (would be implemented in a FlatList)
+  // Handle pull-to-refresh
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchChatRooms();
@@ -95,21 +93,21 @@ export default function ChatListScreen() {
   };
 
   // Navigate to conversation screen
-const goToChat = (chatId, technicianName) => {
-  router.push({
-    pathname: `/(app)/(client)/conversation/${chatId}`,
-    params: { 
-      chatRoomId: chatId,  // Use a clearer param name
-      technicianName 
-    }
-  });
-};
+  const goToChat = (chatId, technicianName, technicianImage) => {
+    router.push({
+      pathname: `/(app)/(client)/conversation/${chatId}`,
+      params: { 
+        technicianName,
+        technicianImage
+      }
+    });
+  };
 
   // Render each chat room item
   const renderChatItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.chatItem}
-      onPress={() => goToChat(item.id, item.name)}
+      onPress={() => goToChat(item.id, item.name, item.avatar)}
     >
       <View style={styles.avatarContainer}>
         {item.avatar ? (
@@ -123,7 +121,7 @@ const goToChat = (chatId, technicianName) => {
       
       <View style={styles.chatInfo}>
         <View style={styles.chatHeader}>
-          <Text style={styles.chatName}>{item.name}</Text>
+          <Text style={styles.chatName} numberOfLines={1}>{item.name}</Text>
           <Text style={styles.chatTime}>{formatTimestamp(item.timestamp)}</Text>
         </View>
         
@@ -183,6 +181,17 @@ const goToChat = (chatId, technicianName) => {
       
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Messages</Text>
+        <TouchableOpacity 
+          style={styles.refreshButton}
+          onPress={handleRefresh}
+          disabled={isLoading || refreshing}
+        >
+          {refreshing ? (
+            <ActivityIndicator size="small" color="#6200EE" />
+          ) : (
+            <Ionicons name="refresh" size={22} color="#6200EE" />
+          )}
+        </TouchableOpacity>
       </View>
       
       <View style={styles.searchContainer}>
@@ -192,9 +201,13 @@ const goToChat = (chatId, technicianName) => {
           placeholder="Search conversations..."
           value={searchQuery}
           onChangeText={setSearchQuery}
+          placeholderTextColor="#999"
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
+          <TouchableOpacity 
+            style={styles.clearButton}
+            onPress={() => setSearchQuery('')}
+          >
             <Ionicons name="close-circle" size={20} color="#999" />
           </TouchableOpacity>
         )}
@@ -223,16 +236,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F7FA',
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: 'bold',
     color: '#333',
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -242,6 +270,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
   },
   searchIcon: {
     marginRight: 8,
@@ -251,6 +284,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     height: 40,
+  },
+  clearButton: {
+    padding: 8,
   },
   chatList: {
     padding: 16,
@@ -264,34 +300,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
+    padding: 14,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
     elevation: 1,
   },
   avatarContainer: {
-    marginRight: 12,
+    marginRight: 14,
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   avatarPlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#E0E0E0',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#6200EE',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#666',
+    color: '#FFFFFF',
   },
   chatInfo: {
     flex: 1,
@@ -304,9 +340,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   chatName: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
     color: '#333',
+    flex: 1,
+    marginRight: 8,
   },
   chatTime: {
     fontSize: 12,
@@ -322,6 +360,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginRight: 8,
+    lineHeight: 20,
   },
   unreadBadge: {
     backgroundColor: '#6200EE',
@@ -344,32 +383,43 @@ const styles = StyleSheet.create({
     marginTop: 60,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#666',
     marginTop: 16,
     marginBottom: 24,
     textAlign: 'center',
+    fontWeight: '500',
   },
   newChatButton: {
+    backgroundColor: '#6200EE',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  newChatButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  retryButton: {
     backgroundColor: '#6200EE',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
-  },
-  newChatButtonText: {
-    color: 'white',
-    fontWeight: '500',
-    fontSize: 14,
-  },
-  retryButton: {
-    backgroundColor: '#F44336',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   retryButtonText: {
     color: 'white',
-    fontWeight: '500',
+    fontWeight: '600',
     fontSize: 14,
   },
 });
