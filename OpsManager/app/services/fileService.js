@@ -20,7 +20,6 @@ const fileService = {
       if (!fileInfo.exists) {
         throw new Error("File doesn't exist");
       }
-      
       // Create form data
       const formData = new FormData();
       formData.append('image', {

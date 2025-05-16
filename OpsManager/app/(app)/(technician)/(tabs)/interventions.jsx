@@ -1,4 +1,4 @@
-// app/(app)/(technician)/(tabs)/interventions.jsx - For Updated Backend
+// app/(app)/(technician)/(tabs)/interventions.jsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -15,8 +15,8 @@ import { ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useAuth } from '../../../contexts/AuthContext';
-import technicianService from '../../../services/technicianService';
+import { useAuth } from '../../../contexts/AuthContext'; // Updated path
+import technicianService from '../../../services/technicianService'; // Updated path
 
 export default function InterventionsScreen() {
   const { user } = useAuth();
@@ -26,22 +26,27 @@ export default function InterventionsScreen() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [error, setError] = useState(null);
 
+  // Load interventions on component mount
   useEffect(() => {
+    console.log('Interventions screen mounted, loading data');
     loadInterventions();
   }, []);
 
+  // Function to load interventions
   const loadInterventions = async () => {
     setIsLoading(true);
     setError(null);
     
     try {
-      // Use the API call from technicianService - no fallback to mock data
-      const data = await technicianService.gettechnicianInterventions();
+      console.log('Calling technicianService.getTechnicianInterventions()');
+      
+      // Use the API call from technicianService
+      const data = await technicianService.getTechnicianInterventions();
       
       console.log('API response data:', data); // Debug log
       
-      // Format the data for display - with updated backend, we now have full data
-      const formattedInterventions = data.map((intervention, index) => {
+      // Format the data for display
+      const formattedInterventions = data.map((intervention) => {
         // Check if technicianId exists and has a name property
         let technicianName = null;
         if (intervention.technicianId) {
@@ -56,21 +61,24 @@ export default function InterventionsScreen() {
         }
         
         return {
-          id: intervention._id,
+          id: intervention._id || intervention.id,
           title: intervention.title || 'Untitled Request',
           description: intervention.description || 'No description provided',
-          status: intervention.status || 'Pending',
+          status: intervention.status?.toLowerCase() || 'pending', // Ensure lowercase for consistency
           category: intervention.category || 'Maintenance',
           date: new Date(intervention.createdAt || Date.now()),
-          technician: technicianName
+          technician: technicianName,
+          // Add all original data for reference when navigating to details
+          originalData: intervention
         };
       });
       
+      console.log(`Formatted ${formattedInterventions.length} interventions`);
       setInterventions(formattedInterventions);
     } catch (error) {
       console.error('Failed to load interventions:', error);
       setError('Failed to load service requests. Pull down to refresh or check your connection.');
-      setInterventions([]); // Set to empty array - no mock data
+      setInterventions([]); // Set to empty array
       
       // Show error alert
       Alert.alert(
@@ -83,12 +91,14 @@ export default function InterventionsScreen() {
     }
   };
 
+  // Refresh function
   const onRefresh = async () => {
     setRefreshing(true);
     await loadInterventions();
     setRefreshing(false);
   };
 
+  // Helper function to get status color
   const getStatusColor = (status) => {
     // Normalize status to lowercase for case-insensitive comparison
     const normalizedStatus = status.toLowerCase();
@@ -107,7 +117,10 @@ export default function InterventionsScreen() {
     }
   };
 
+  // Helper function to get icon for category
   const getIconForCategory = (category) => {
+    if (!category) return 'construct-outline';
+    
     const categoryIcons = {
       'IT Services': 'desktop-outline',
       'Surveillance': 'videocam-outline',
@@ -123,12 +136,13 @@ export default function InterventionsScreen() {
     return categoryIcons[category] || 'construct-outline';
   };
 
+  // Filter interventions based on active filter
   const filterInterventions = () => {
     if (activeFilter === 'all') {
       return interventions;
     }
     
-    // Direct filter without mapping since we're using the database status values
+    // Filter based on status
     return interventions.filter(item => {
       // Convert to lowercase for case-insensitive comparison
       const itemStatus = item.status.toLowerCase();
@@ -148,6 +162,7 @@ export default function InterventionsScreen() {
     });
   };
 
+  // Format status for display
   const getDisplayStatus = (status) => {
     // Convert database status to user-friendly display format
     const normalizedStatus = status.toLowerCase();
@@ -166,10 +181,18 @@ export default function InterventionsScreen() {
     }
   };
 
+  // Render intervention item
   const renderInterventionItem = ({ item }) => (
     <TouchableOpacity
       style={styles.interventionCard}
-      onPress={() => router.push(`/(app)/(technician)/intervention/${item.id}`)}
+      onPress={() => router.push({
+        pathname: `/(app)/(technician)/intervention/${item.id}`,
+        // Pass additional params if needed
+        params: { 
+          id: item.id,
+          title: item.title
+        }
+      })}
     >
       <View style={styles.cardHeader}>
         <View style={[styles.categoryBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
@@ -226,6 +249,7 @@ export default function InterventionsScreen() {
     </TouchableOpacity>
   );
 
+  // Render empty list
   const renderEmptyList = () => (
     <View style={styles.emptyContainer}>
       {error ? (
@@ -248,6 +272,7 @@ export default function InterventionsScreen() {
     </View>
   );
 
+  // Filter options
   const filterOptions = [
     { id: 'all', label: 'All' },
     { id: 'scheduled', label: 'Scheduled' },

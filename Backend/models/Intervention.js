@@ -18,9 +18,9 @@ const InterventionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
-  category :{
+  category: {
     type: String,
-    enum: ['IT Services', 'Surveillance', 'Telephony', 'Printers', 'Software', 'Office Supplies', 'Maintenance', 'Alarms','Sound Systems'],
+    enum: ['IT Services', 'Surveillance', 'Telephony', 'Printers', 'Software', 'Office Supplies', 'Maintenance', 'Alarms', 'Sound Systems'],
   },
   location: {
     type: String,
@@ -32,12 +32,20 @@ const InterventionSchema = new mongoose.Schema({
     default: 'Pending'
   },
 
-  attachmentsList: [String]
+  attachmentsList: [String],
+  evidence: {
+    notes: {
+      type: String,
+      default: ''
+    },
+    photos: [String]
+  }
+
 
 }, { timestamps: true });
 
 // Update the updatedAt field on save
-InterventionSchema.pre('save', function(next) {
+InterventionSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });

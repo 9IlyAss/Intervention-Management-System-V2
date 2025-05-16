@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ClientTabLayout() {
   const insets = useSafeAreaInsets();
- 
+  console.log('ClientTabLayout rendered');
+
   return (
     <Tabs
       screenOptions={{

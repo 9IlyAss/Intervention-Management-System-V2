@@ -56,38 +56,36 @@ Router.get('/interventions/:id', protect, async (req, res) => {
 });
 
 // @route PATCH /api/technician/interventions/:id/status
-// @desc Update intervention status (requires evidence for Completed/Problematic)
+// @desc Update intervention status (requires evidence for Completed/Cancelled)
 // @access Private (Technician)
 Router.patch('/interventions/:id/status', protect, async (req, res) => {
     try {
-        const { status, attachments } = req.body;
+        const { status, evidence } = req.body;
         const validStatuses = ['Pending', 'In Progress', 'Completed', 'Cancelled'];
-        
-        // Validate status
+
         if (!validStatuses.includes(status)) {
             return res.status(400).json({ error: 'Invalid status value' });
         }
 
-        // Check evidence requirement
         const requiresEvidence = ['Completed', 'Cancelled'].includes(status);
-        if (requiresEvidence && (!attachments || !attachments.length)) {
+
+        if (requiresEvidence && (!evidence  || !evidence.photos || !evidence.photos.length)) {
             return res.status(400).json({ 
-                error: 'Evidence attachments are required for Completed/Cancelled status' 
+                error: 'Evidence (photos) are required for Completed or Cancelled status' 
             });
         }
 
-        // Prepare update object
         const update = { status };
+
         if (requiresEvidence) {
-            update.$push = { attachmentsList: { $each: attachments } };
+            update.evidence = {
+                notes: evidence.notes,
+                photos: evidence.photos
+            };
         }
 
-        // Execute update
         const intervention = await Intervention.findOneAndUpdate(
-            { 
-                _id: req.params.id, 
-                technicianId: req.user.id 
-            },
+            { _id: req.params.id, technicianId: req.user.id },
             update,
             { new: true }
         );

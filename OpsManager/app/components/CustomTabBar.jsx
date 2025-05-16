@@ -11,7 +11,9 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
   // Determine if we're in client or tech section
   const isClient = pathname.includes('/client/');
   const baseRoute = isClient ? '/(app)/client/' : '/(app)/technician/';
-  
+  console.log('Current pathname:', pathname);
+  console.log('Base route:', baseRoute);
+
   return (
     <View style={styles.container}>
       {state.routes.map((route, index) => {

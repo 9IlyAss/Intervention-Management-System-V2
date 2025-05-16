@@ -1,4 +1,4 @@
-// app/(app)/(client)/profile.jsx
+// app/(app)/(technician)/profile.jsx
 import React, { useState } from 'react';
 import {
   View,
@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '../../../contexts/AuthContext';
 
-export default function ClientProfile() {
+export default function technicianProfile() {
   const { user, logout } = useAuth();
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -45,35 +45,35 @@ export default function ClientProfile() {
       title: 'Personal Information',
       icon: 'person-outline',
       color: '#6200EE',
-      onPress: () => router.push('/(app)/(client)/edit-profile'),
+      onPress: () => router.push('/(app)/(technician)/edit-profile'),
     },
     {
       id: 'payment',
       title: 'Payment Methods',
       icon: 'card-outline',
       color: '#4CAF50',
-      onPress: () => router.push('/(app)/(client)/payment-methods'),
+      onPress: () => router.push('/(app)/(technician)/payment-methods'),
     },
     {
       id: 'addresses',
       title: 'Saved Addresses',
       icon: 'location-outline',
       color: '#2196F3',
-      onPress: () => router.push('/(app)/(client)/addresses'),
+      onPress: () => router.push('/(app)/(technician)/addresses'),
     },
     {
       id: 'help',
       title: 'Help & Support',
       icon: 'help-circle-outline',
       color: '#FF9800',
-      onPress: () => router.push('/(app)/(client)/support'),
+      onPress: () => router.push('/(app)/(technician)/support'),
     },
     {
       id: 'about',
       title: 'About Us',
       icon: 'information-circle-outline',
       color: '#9C27B0',
-      onPress: () => router.push('/(app)/(client)/about'),
+      onPress: () => router.push('/(app)/(technician)/about'),
     },
   ];
 
@@ -104,12 +104,12 @@ export default function ClientProfile() {
             </TouchableOpacity>
           </View>
           
-          <Text style={styles.profileName}>{user?.name || 'Client Name'}</Text>
-          <Text style={styles.profileEmail}>{user?.email || 'client@example.com'}</Text>
+          <Text style={styles.profileName}>{user?.name || 'technician Name'}</Text>
+          <Text style={styles.profileEmail}>{user?.email || 'technician@example.com'}</Text>
           
           <TouchableOpacity 
             style={styles.editProfileButton}
-            onPress={() => router.push('/(app)/(client)/edit-profile')}
+            onPress={() => router.push('/(app)/(technician)/edit-profile')}
           >
             <Text style={styles.editProfileText}>Edit Profile</Text>
           </TouchableOpacity>

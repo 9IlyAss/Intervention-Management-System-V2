@@ -1,4 +1,4 @@
-// app/(app)/(client)/ImageViewer.jsx
+// app/(app)/(shared)/ImageViewer.jsx
 import React, { useState } from 'react';
 import {
   View,
@@ -27,7 +27,12 @@ export default function ImageViewer() {
   const handleImageLoad = () => {
     setIsLoading(false);
   };
-  
+  const { from } = useLocalSearchParams();
+
+const handleBack = () => {
+  if (from) router.push(from);
+  else router.back();
+};
   const handleImageError = () => {
     setIsLoading(false);
     setError('Failed to load image. The image may be unavailable or the URL may be invalid.');
@@ -40,7 +45,7 @@ export default function ImageViewer() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => handleBack()}
         >
           <Ionicons name="arrow-back" size={24} color="#FFF" />
         </TouchableOpacity>

@@ -1,4 +1,5 @@
 // app/(app)/(technician)/Assignment.jsx
+
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -21,6 +22,8 @@ import { router } from "expo-router";
 import { useAuth } from "../../../contexts/AuthContext";
 import technicianService from "../../../services/technicianService";
 import * as ImagePicker from "expo-image-picker";
+import fileService from "../../../services/fileService";
+
 
 export default function AssignmentScreen() {
   const { user } = useAuth();
@@ -29,7 +32,7 @@ export default function AssignmentScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState("all"); // "all", "pending", "in-progress"
+  const [filter, setFilter] = useState("all"); // "all", "Pending", "in-progress"
   
   // For status update modal
   const [modalVisible, setModalVisible] = useState(false);
@@ -68,13 +71,13 @@ export default function AssignmentScreen() {
         date: new Date(intervention.createdAt || Date.now()).toLocaleDateString(),
         time: new Date(intervention.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         serviceType: intervention.category || 'General',
-        status: intervention.status.toLowerCase() || 'pending',
+        status: intervention.status || 'Pending',
         category: intervention.category || 'General Services',
         location: intervention.location || 'No location provided',
         hasAttachments: intervention.attachmentsList?.length > 0,
         attachments: intervention.attachmentsList || []
       }));
-      
+
       setInterventions(formattedInterventions);
     } catch (err) {
       console.error('Failed to load interventions:', err);
@@ -87,19 +90,19 @@ export default function AssignmentScreen() {
   // Function to filter interventions
   const filterInterventions = () => {
     if (filter === "all") {
-      // Show only pending and in-progress interventions
+      // Show only Pending and in-progress interventions
       setFilteredInterventions(
         interventions.filter(item => 
-          item.status === "pending" || item.status === "in progress"
+          item.status === "Pending" || item.status === "In Progress"
         )
       );
-    } else if (filter === "pending") {
+    } else if (filter === "Pending") {
       setFilteredInterventions(
-        interventions.filter(item => item.status === "pending")
+        interventions.filter(item => item.status === "Pending")
       );
     } else if (filter === "in-progress") {
       setFilteredInterventions(
-        interventions.filter(item => item.status === "in progress")
+        interventions.filter(item => item.status === "In Progress")
       );
     }
   };
@@ -121,62 +124,71 @@ export default function AssignmentScreen() {
   };
   
   // Update intervention status
-  const updateInterventionStatus = async () => {
-    if (!selectedIntervention) return;
+// Update intervention status
+const updateInterventionStatus = async () => {
+  if (!selectedIntervention) return;
+  
+  try {
+    let imageUrls = []
+    setIsLoading(true);
+    if (photos.length > 0) {
+            imageUrls = await fileService.uploadMultipleImages(
+            photos, 
+          );}
+    // Prepare evidence payload
+    const evidencePayload = {
+      notes: notes.trim(),
+      photos: imageUrls
+    };
+
+    // Call API to update status
+    const updatedIntervention = await technicianService.updateInterventionStatus(
+      selectedIntervention.id,
+      newStatus,
+      evidencePayload
+    );
+
+    // Update the local state with the response data
+    const updatedInterventions = interventions.map(item => 
+      item.id === selectedIntervention.id ? {
+        ...item,
+        status: updatedIntervention.status,
+        hasAttachments: updatedIntervention.evidence?.photos?.length > 0,
+        attachments: [
+          ...(item.attachments || []),
+          ...(updatedIntervention.evidence?.photos || [])
+        ]
+      } : item
+    );
+
+    setInterventions(updatedInterventions);
+    setModalVisible(false);
     
-    // Check if attachments are required for completed or cancelled
-    if ((newStatus === "completed" || newStatus === "cancelled") && photos.length === 0) {
-      Alert.alert(
-        "Attachments Required",
-        "Please add at least one photo before marking as completed or cancelled."
-      );
-      return;
-    }
+    Alert.alert(
+      "Status Updated",
+      `Intervention status has been updated to ${newStatus}.`
+    );
+  } catch (err) {
+    console.error('Status update error:', err);
     
-    try {
-      setIsLoading(true);
-      
-      // Call API to update status
-      await technicianService.updateInterventionStatus(
-        selectedIntervention.id,
-        newStatus,
-        photos
-      );
-      
-      // Update the local state
-      const updatedInterventions = interventions.map(item => {
-        if (item.id === selectedIntervention.id) {
-          return {
-            ...item,
-            status: newStatus,
-            hasAttachments: photos.length > 0,
-            attachments: [...(item.attachments || []), ...photos]
-          };
-        }
-        return item;
-      });
-      
-      setInterventions(updatedInterventions);
-      
-      // Close modal
-      setModalVisible(false);
-      setSelectedIntervention(null);
-      
-      // Show success message
-      Alert.alert(
-        "Status Updated",
-        `Intervention status has been updated to ${newStatus}.`
-      );
-    } catch (err) {
-      console.error('Failed to update status:', err);
-      Alert.alert(
-        "Update Failed",
-        "Failed to update the intervention status. Please try again."
-      );
-    } finally {
-      setIsLoading(false);
+    let errorMessage = err.message;
+    if (err.status === 400) {
+      errorMessage = err.details || "Invalid request data";
+    } else if (err.status === 404) {
+      errorMessage = "Intervention not found";
     }
-  };
+
+    Alert.alert(
+      "Update Failed",
+      errorMessage
+    );
+  } finally {
+    setIsLoading(false);
+    setSelectedIntervention(null);
+    setPhotos([]);
+    setNotes("");
+  }
+};
   
   // Pick image from gallery
   const pickImage = async () => {
@@ -242,13 +254,13 @@ export default function AssignmentScreen() {
   // Helper function to get status color
   const getStatusColor = (status) => {
     switch (status) {
-      case 'pending':
+      case 'Pending':
         return '#FF9800'; // Orange
-      case 'in progress':
+      case 'In Progress':
         return '#2196F3'; // Blue
-      case 'completed':
+      case 'Completed':
         return '#4CAF50'; // Green
-      case 'cancelled':
+      case 'Cancelled':
         return '#F44336'; // Red
       default:
         return '#757575'; // Grey
@@ -362,7 +374,7 @@ export default function AssignmentScreen() {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Assignments</Text>
-        <View style={{ width: 40 }} /> {/* For alignment */}
+        <View style={{ width: 40 }} /> 
       </View>
       
       {/* Filter Tabs */}
@@ -385,13 +397,13 @@ export default function AssignmentScreen() {
         <TouchableOpacity
           style={[
             styles.filterTab,
-            filter === "pending" && styles.activeFilterTab
+            filter === "Pending" && styles.activeFilterTab
           ]}
-          onPress={() => setFilter("pending")}
+          onPress={() => setFilter("Pending")}
         >
           <Text style={[
             styles.filterTabText,
-            filter === "pending" && styles.activeFilterTabText
+            filter === "Pending" && styles.activeFilterTabText
           ]}>
             Pending
           </Text>
@@ -479,13 +491,13 @@ export default function AssignmentScreen() {
                       <TouchableOpacity
                         style={[
                           styles.statusChip,
-                          newStatus === "pending" && { backgroundColor: "#FFF8E1", borderColor: "#FF9800" }
+                          newStatus === "Pending" && { backgroundColor: "#FFF8E1", borderColor: "#FF9800" }
                         ]}
-                        onPress={() => setNewStatus("pending")}
+                        onPress={() => setNewStatus("Pending")}
                       >
                         <Text style={[
                           styles.statusChipText,
-                          newStatus === "pending" && { color: "#FF9800" }
+                          newStatus === "Pending" && { color: "#FF9800" }
                         ]}>
                           Pending
                         </Text>
@@ -494,13 +506,13 @@ export default function AssignmentScreen() {
                       <TouchableOpacity
                         style={[
                           styles.statusChip,
-                          newStatus === "in progress" && { backgroundColor: "#E3F2FD", borderColor: "#2196F3" }
+                          newStatus === "In Progress" && { backgroundColor: "#E3F2FD", borderColor: "#2196F3" }
                         ]}
-                        onPress={() => setNewStatus("in progress")}
+                        onPress={() => setNewStatus("In Progress")}
                       >
                         <Text style={[
                           styles.statusChipText,
-                          newStatus === "in progress" && { color: "#2196F3" }
+                          newStatus === "In Progress" && { color: "#2196F3" }
                         ]}>
                           In Progress
                         </Text>
@@ -509,13 +521,13 @@ export default function AssignmentScreen() {
                       <TouchableOpacity
                         style={[
                           styles.statusChip,
-                          newStatus === "completed" && { backgroundColor: "#E8F5E9", borderColor: "#4CAF50" }
+                          newStatus === "Completed" && { backgroundColor: "#E8F5E9", borderColor: "#4CAF50" }
                         ]}
-                        onPress={() => setNewStatus("completed")}
+                        onPress={() => setNewStatus("Completed")}
                       >
                         <Text style={[
                           styles.statusChipText,
-                          newStatus === "completed" && { color: "#4CAF50" }
+                          newStatus === "Completed" && { color: "#4CAF50" }
                         ]}>
                           Completed
                         </Text>
@@ -524,13 +536,13 @@ export default function AssignmentScreen() {
                       <TouchableOpacity
                         style={[
                           styles.statusChip,
-                          newStatus === "cancelled" && { backgroundColor: "#FFEBEE", borderColor: "#F44336" }
+                          newStatus === "Cancelled" && { backgroundColor: "#FFEBEE", borderColor: "#F44336" }
                         ]}
-                        onPress={() => setNewStatus("cancelled")}
+                        onPress={() => setNewStatus("Cancelled")}
                       >
                         <Text style={[
                           styles.statusChipText,
-                          newStatus === "cancelled" && { color: "#F44336" }
+                          newStatus === "Cancelled" && { color: "#F44336" }
                         ]}>
                           Cancelled
                         </Text>
@@ -583,7 +595,6 @@ export default function AssignmentScreen() {
                       <View style={styles.clientInfo}>
                         <Text style={styles.clientNameDetail}>{selectedIntervention.clientName}</Text>
                         <Text style={styles.clientContact}>{selectedIntervention.clientPhone}</Text>
-                        <Text style={styles.clientContact}>{selectedIntervention.clientAddress}</Text>
                       </View>
                     </View>
                   </View>
@@ -602,59 +613,61 @@ export default function AssignmentScreen() {
                     </View>
                   )}
                   
-                  {(newStatus === "completed" || newStatus === "cancelled") && (
-                    <View style={styles.detailSection}>
-                      <Text style={styles.detailLabel}>
-                        Add Photos
-                        <Text style={styles.requiredText}> (Required)</Text>
-                      </Text>
-                      <View style={styles.photoContainer}>
-                        {photos.map((photo, index) => (
-                          <View key={index} style={styles.photoPreview}>
-                            <Image source={{ uri: photo }} style={styles.photoImage} />
-                            <TouchableOpacity
-                              style={styles.removePhotoButton}
-                              onPress={() => removePhoto(index)}
-                            >
-                              <Ionicons name="close-circle" size={22} color="#F44336" />
-                            </TouchableOpacity>
-                          </View>
-                        ))}
-                        
-                        <View style={styles.photoButtons}>
-                          <TouchableOpacity
-                            style={styles.photoButton}
-                            onPress={pickImage}
-                          >
-                            <Ionicons name="image-outline" size={24} color="#6200EE" />
-                            <Text style={styles.photoButtonText}>Gallery</Text>
-                          </TouchableOpacity>
-                          
-                          <TouchableOpacity
-                            style={styles.photoButton}
-                            onPress={takePhoto}
-                          >
-                            <Ionicons name="camera-outline" size={24} color="#6200EE" />
-                            <Text style={styles.photoButtonText}>Camera</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </View>
-                  )}
+                  {(newStatus === "Completed" || newStatus === "Cancelled") && (
+  <>
+    {/* Photo Upload Section */}
+    <View style={styles.detailSection}>
+      <Text style={styles.detailLabel}>
+        Add Photos
+        <Text style={styles.requiredText}> (Required)</Text>
+      </Text>
+
+      <View style={styles.photoContainer}>
+        {photos.map((photo, index) => (
+          <View key={index} style={styles.photoPreview}>
+            <Image source={{ uri: photo }} style={styles.photoImage} />
+            <TouchableOpacity
+              style={styles.removePhotoButton}
+              onPress={() => removePhoto(index)}
+            >
+              <Ionicons name="close-circle" size={22} color="#F44336" />
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        {/* Buttons to pick/take photo */}
+        <View style={styles.photoButtons}>
+          <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
+            <Ionicons name="image-outline" size={24} color="#6200EE" />
+            <Text style={styles.photoButtonText}>Gallery</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.photoButton} onPress={takePhoto}>
+            <Ionicons name="camera-outline" size={24} color="#6200EE" />
+            <Text style={styles.photoButtonText}>Camera</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+
+    {/* Notes Section */}
+    <View style={styles.detailSection}>
+      <Text style={styles.detailLabel}>Notes (Optional)</Text>
+      <TextInput
+        style={styles.notesInput}
+        placeholder="Add any notes about this intervention..."
+        value={notes}
+        onChangeText={setNotes}
+        multiline
+        numberOfLines={4}
+        textAlignVertical="top"
+      />
+    </View>
+  </>
+)}
+
                   
-                  {/* Notes - Optional */}
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>Notes (Optional)</Text>
-                    <TextInput
-                      style={styles.notesInput}
-                      placeholder="Add any notes about this intervention..."
-                      value={notes}
-                      onChangeText={setNotes}
-                      multiline
-                      numberOfLines={4}
-                      textAlignVertical="top"
-                    />
-                  </View>
+                  
                 </>
               )}
             </ScrollView>

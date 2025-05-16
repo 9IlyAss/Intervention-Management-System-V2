@@ -1,4 +1,4 @@
-// app/(app)/(technician)/intervention/[id].jsx - Technician view
+// app/(app)/(client)/intervention/[id].jsx - Complete with full styles
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -9,27 +9,23 @@ import {
   ActivityIndicator,
   Alert,
   TextInput,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
-import technicianService from '../../../services/technicianService';
-import ImageViewer from '../../(client)/ImageViewer';
+import clientService from '../../../services/clientService';
 
-export default function TechnicianInterventionDetailScreen() {
+export default function InterventionDetailScreen() {
   const { id } = useLocalSearchParams();
   const [intervention, setIntervention] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showUpdateForm, setShowUpdateForm] = useState(false);
-  const [statusUpdate, setStatusUpdate] = useState('');
-  const [notes, setNotes] = useState('');
-  const [photos, setPhotos] = useState([]);
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   useEffect(() => {
     loadInterventionDetails();
   }, [id]);
@@ -45,15 +41,8 @@ export default function TechnicianInterventionDetailScreen() {
     setError(null);
     
     try {
-      const data = await technicianService.getInterventionDetails(id);
+      const data = await clientService.getInterventionDetails(id);
       setIntervention(data);
-      
-      // Initialize form with current values
-      if (data) {
-        setStatusUpdate(data.status);
-        setNotes(data.evidence?.notes || '');
-        setPhotos(data.evidence?.photos || []);
-      }
     } catch (error) {
       console.error('Failed to load intervention details:', error);
       setError('Failed to load service request details. Please try again.');
@@ -69,106 +58,43 @@ export default function TechnicianInterventionDetailScreen() {
     }
   };
 
-  const pickImage = async () => {
-    try {
-      // Request permissions
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (!permissionResult.granted) {
-        Alert.alert('Permission Required', 'You need to grant access to your photos to add images.');
-        return;
-      }
-      
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-      
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        // Add the selected image to photos array (this would be a URI in a real app)
-        setPhotos([...photos, result.assets[0].uri]);
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to select image. Please try again.');
-    }
-  };
-
-  const takePhoto = async () => {
-    try {
-      // Request camera permissions
-      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-      
-      if (!permissionResult.granted) {
-        Alert.alert('Permission Required', 'You need to grant access to your camera to take photos.');
-        return;
-      }
-      
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-      
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        // Add the captured image to photos array
-        setPhotos([...photos, result.assets[0].uri]);
-      }
-    } catch (error) {
-      console.error('Error taking photo:', error);
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
-    }
-  };
-
-  const removePhoto = (index) => {
-    const updatedPhotos = [...photos];
-    updatedPhotos.splice(index, 1);
-    setPhotos(updatedPhotos);
-  };
-
-  const handleUpdateIntervention = async () => {
-    if (!statusUpdate) {
-      Alert.alert('Error', 'Please select a status before submitting.');
+  const handleSubmitFeedback = async () => {
+    if (rating === 0) {
+      Alert.alert('Error', 'Please select a rating before submitting feedback.');
       return;
     }
 
     setIsSubmitting(true);
     
     try {
-      // Prepare the update data
-      const updateData = {
-        status: statusUpdate,
-        evidence: {
-          notes: notes,
-          photos: photos
-        }
-      };
-      
-      await technicianService.updateIntervention(id, updateData);
+      await clientService.submitFeedback(id, {
+        rating,
+        comment
+      });
       
       Alert.alert(
         'Success',
-        'Service request has been updated successfully!',
+        'Thank you for your feedback!',
         [
           { 
             text: 'OK', 
             onPress: () => {
-              setShowUpdateForm(false);
-              loadInterventionDetails(); // Reload to show updates
+              setShowFeedbackForm(false);
+              loadInterventionDetails(); // Reload to show the feedback
             }
           }
         ]
       );
     } catch (error) {
-      console.error('Failed to update service request:', error);
+      console.error('Failed to submit feedback:', error);
       
-      // Show specific error message based on API error
-      let errorMessage = 'Failed to update service request. Please try again.';
+      // Show more specific error message based on API error
+      let errorMessage = 'Failed to submit feedback. Please try again.';
       
       if (error.response && error.response.data && error.response.data.error) {
         errorMessage = error.response.data.error;
+      } else if (error.message && error.message.includes('not completed')) {
+        errorMessage = 'Feedback can only be submitted for completed service requests.';
       }
       
       Alert.alert('Error', errorMessage);
@@ -215,6 +141,106 @@ export default function TechnicianInterventionDetailScreen() {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const renderFeedbackSection = () => {
+    // Only show feedback section if intervention is completed and no feedback exists yet
+    if (intervention?.status === 'Completed' && !intervention?.feedback) {
+      return (
+        <View style={styles.feedbackSection}>
+          {showFeedbackForm ? (
+            <View style={styles.feedbackForm}>
+              <Text style={styles.feedbackTitle}>Rate your experience</Text>
+              
+              <View style={styles.ratingContainer}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity
+                    key={star}
+                    onPress={() => setRating(star)}
+                  >
+                    <Ionicons
+                      name={rating >= star ? "star" : "star-outline"}
+                      size={32}
+                      color={rating >= star ? "#FFC107" : "#CCCCCC"}
+                      style={styles.starIcon}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+              
+              <TextInput
+                style={styles.commentInput}
+                placeholder="Add additional comments (optional)"
+                value={comment}
+                onChangeText={setComment}
+                multiline
+                numberOfLines={4}
+              />
+              
+              <View style={styles.feedbackButtons}>
+                <TouchableOpacity 
+                  style={[styles.button, styles.cancelButton]}
+                  onPress={() => setShowFeedbackForm(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[
+                    styles.button, 
+                    styles.submitButton,
+                    rating === 0 && styles.disabledButton
+                  ]}
+                  onPress={handleSubmitFeedback}
+                  disabled={isSubmitting || rating === 0}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>Submit Feedback</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.leaveFeedbackButton}
+              onPress={() => setShowFeedbackForm(true)}
+            >
+              <Ionicons name="star-outline" size={20} color="#6200EE" />
+              <Text style={styles.leaveFeedbackText}>Leave Feedback</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      );
+    } else if (intervention?.feedback) {
+      // If feedback already exists
+      return (
+        <View style={styles.existingFeedback}>
+          <Text style={styles.feedbackTitle}>Your Feedback</Text>
+          
+          <View style={styles.ratingDisplay}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Ionicons
+                key={star}
+                name={intervention.feedback.rating >= star ? "star" : "star-outline"}
+                size={20}
+                color={intervention.feedback.rating >= star ? "#FFC107" : "#CCCCCC"}
+              />
+            ))}
+            <Text style={styles.ratingDate}>
+              Submitted on {formatDate(intervention.feedback.date)}
+            </Text>
+          </View>
+          
+          {intervention.feedback.comment ? (
+            <Text style={styles.feedbackComment}>"{intervention.feedback.comment}"</Text>
+          ) : null}
+        </View>
+      );
+    }
+    
+    return null;
   };
 
   if (isLoading) {
@@ -267,7 +293,7 @@ export default function TechnicianInterventionDetailScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Technician Service View</Text>
+        <Text style={styles.headerTitle}>Service Request Details</Text>
         <View style={styles.spacer} />
       </View>
 
@@ -337,134 +363,117 @@ export default function TechnicianInterventionDetailScreen() {
             <Text style={styles.description}>{intervention.description}</Text>
           </View>
           
-          {intervention.clientId ? (
+          {intervention.technicianId ? (
             <>
               <View style={styles.divider} />
-              <View style={styles.clientSection}>
-                <Text style={styles.sectionTitle}>Client Information</Text>
-                <View style={styles.clientInfo}>
-                  <View style={styles.clientAvatar}>
+              <View style={styles.technicianSection}>
+                <Text style={styles.sectionTitle}>Assigned Technician</Text>
+                <View style={styles.technicianInfo}>
+                  <View style={styles.technicianAvatar}>
                     <Ionicons name="person" size={24} color="#FFFFFF" />
                   </View>
-                  <View style={styles.clientDetails}>
-                    <Text style={styles.clientName}>
-                      {intervention.clientId.name || 'Name not available'}
+                  <View style={styles.technicianDetails}>
+                    <Text style={styles.technicianName}>
+                      {intervention.technicianId.name || 'Name not available'}
                     </Text>
-                    {intervention.clientId.email ? (
-                      <Text style={styles.clientEmail}>
-                        {intervention.clientId.email}
+                    {intervention.technicianId.email ? (
+                      <Text style={styles.technicianEmail}>
+                        {intervention.technicianId.email}
                       </Text>
                     ) : null}
-                    {intervention.clientId.phone ? (
-                      <Text style={styles.clientEmail}>
-                        {intervention.clientId.phone}
+                    {intervention.technicianId.phone ? (
+                      <Text style={styles.technicianEmail}>
+                        {intervention.technicianId.phone}
                       </Text>
                     ) : null}
                   </View>
                 </View>
               </View>
             </>
-          ) : null}
+          ) : (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.technicianSection}>
+                <Text style={styles.sectionTitle}>Assigned Technician</Text>
+                <Text style={styles.noTechnician}>
+                  No technician assigned yet
+                </Text>
+              </View>
+            </>
+          )}
           
           {intervention.attachmentsList && intervention.attachmentsList.length > 0 ? (
             <>
               <View style={styles.divider} />
               <View style={styles.attachmentsSection}>
-                <Text style={styles.sectionTitle}>Client Attachments</Text>
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.photoScrollView}
-                >
+                <Text style={styles.sectionTitle}>Attachments</Text>
+                <View style={styles.attachmentsList}>
                   {intervention.attachmentsList.map((attachment, index) => {
                     // Check if it's an image URL by extension
                     const isImage = attachment.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)$/);
                     
-                    if (isImage) {
-                      return (
-                        <TouchableOpacity
-                          key={index}
-                          style={styles.photoThumbnail}
-                          onPress={() => {
-                            router.push(`/(app)/(technician)/ImageViewer?url=${encodeURIComponent(attachment)}`);
-                          }}
-                        >
-                          <Image 
-                            source={{ uri: attachment }} 
-                            style={styles.thumbnailImage}
-                            resizeMode="cover"
-                          />
-                        </TouchableOpacity>
-                      );
-                    } else {
-                      return (
-                        <TouchableOpacity 
-                          key={index}
-                          style={styles.attachmentItem}
-                          onPress={() => {
+                    return (
+                      <TouchableOpacity 
+                        key={index}
+                        style={styles.attachmentItem}
+                        onPress={() => {
+                          if (isImage) {
+                            // Navigate to image viewer with the image URL
+                            router.push(`/(app)/(client)/ImageViewer?url=${encodeURIComponent(attachment)}`);
+                          } else {
                             // Handle non-image attachments
                             Alert.alert('View Attachment', `Opening ${attachment}...`);
-                          }}
-                        >
-                          <Ionicons name="document-outline" size={24} color="#6200EE" />
-                          <Text style={styles.attachmentName}>
-                            {attachment.split('/').pop()}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    }
+                          }
+                        }}
+                      >
+                        {isImage ? (
+                          <>
+                            <Ionicons name="image-outline" size={24} color="#6200EE" />
+                            <Text style={styles.attachmentName}>
+                              {attachment.split('/').pop()}
+                            </Text>
+                          </>
+                        ) : (
+                          <>
+                            <Ionicons name="document-outline" size={24} color="#6200EE" />
+                            <Text style={styles.attachmentName}>
+                              {attachment.split('/').pop()}
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    );
                   })}
-                </ScrollView>
-              </View>
-            </>
-          ) : null}
-          
-          {/* Technician Evidence Section */}
-          {intervention.evidence && (intervention.evidence.notes || (intervention.evidence.photos && intervention.evidence.photos.length > 0)) ? (
-            <>
-              <View style={styles.divider} />
-              <View style={styles.evidenceSection}>
-                <Text style={styles.sectionTitle}>Technician Notes</Text>
-                
-                {intervention.evidence.notes ? (
-                  <Text style={styles.evidenceNotes}>
-                    {intervention.evidence.notes}
-                  </Text>
-                ) : null}
-                
-                {intervention.evidence.photos && intervention.evidence.photos.length > 0 ? (
-                  <View style={styles.evidencePhotos}>
-                    <Text style={styles.photoTitle}>Work Evidence Photos:</Text>
-                    <ScrollView 
-                      horizontal 
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.photoScrollView}
-                    >
-                      {intervention.evidence.photos.map((photo, index) => (
-                        <TouchableOpacity
-                          key={index}
-                          style={styles.photoThumbnail}
-                          onPress={() => {
-                            // Fixed: Pass the correct photo URI to ImageViewer
-                            router.push(`/(app)/(technician)/ImageViewer?url=${encodeURIComponent(photo)}`);
-                          }}
-                        >
-                          <Image 
-                            source={{ uri: photo }} 
-                            style={styles.thumbnailImage}
-                            resizeMode="cover"
-                          />
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-                ) : null}
+                </View>
               </View>
             </>
           ) : null}
         </View>
         
- 
+        {renderFeedbackSection()}
+        
+        {/* Conditionally show cancel button for Pending requests */}
+        {intervention.status === 'Pending' ? (
+          <TouchableOpacity 
+            style={styles.cancelRequestButton}
+            onPress={() => Alert.alert(
+              'Cancel Request',
+              'Are you sure you want to cancel this service request?',
+              [
+                { text: 'No', style: 'cancel' },
+                { 
+                  text: 'Yes, Cancel Request', 
+                  style: 'destructive',
+                  // This would actually need to call an API to update the status
+                  onPress: () => Alert.alert('Not Implemented', 'This feature would be implemented in a full app') 
+                }
+              ]
+            )}
+          >
+            <Ionicons name="close-circle-outline" size={20} color="#F44336" />
+            <Text style={styles.cancelRequestText}>Cancel Request</Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -604,34 +613,39 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: '#555',
   },
-  clientSection: {
+  technicianSection: {
     marginBottom: 16,
   },
-  clientInfo: {
+  technicianInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  clientAvatar: {
+  technicianAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FF9800',
+    backgroundColor: '#6200EE',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  clientDetails: {
+  technicianDetails: {
     flex: 1,
   },
-  clientName: {
+  technicianName: {
     fontSize: 16,
     fontWeight: '500',
     color: '#333',
   },
-  clientEmail: {
+  technicianEmail: {
     fontSize: 14,
     color: '#666',
     marginTop: 2,
+  },
+  noTechnician: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
   },
   attachmentsSection: {
     marginBottom: 16,
@@ -651,42 +665,7 @@ const styles = StyleSheet.create({
     color: '#333',
     marginLeft: 8,
   },
-  evidenceSection: {
-    marginBottom: 16,
-  },
-  evidenceNotes: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: '#333',
-    marginBottom: 16,
-  },
-  evidencePhotos: {
-    marginTop: 8,
-  },
-  photoTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#666',
-    marginBottom: 8,
-  },
-  photoScrollView: {
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  photoThumbnail: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
-    marginRight: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  thumbnailImage: {
-    width: '100%',
-    height: '100%',
-  },
-  actionsCard: {
+  feedbackSection: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
@@ -697,144 +676,58 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  actionButton: {
+  leaveFeedbackButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#6200EE',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    marginBottom: 12,
+    paddingVertical: 12,
   },
-  actionButtonText: {
-    color: '#FFFFFF',
+  leaveFeedbackText: {
+    color: '#6200EE',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     marginLeft: 8,
   },
-  contactButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#4CAF50',
-  },
-  // Update Form Styles
-  updateForm: {
+  feedbackForm: {
     padding: 4,
   },
-  formTitle: {
-    fontSize: 18,
+  feedbackTitle: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
     marginBottom: 16,
     textAlign: 'center',
   },
-  formSection: {
+  ratingContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     marginBottom: 20,
   },
-  formLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#555',
-    marginBottom: 8,
+  starIcon: {
+    marginHorizontal: 8,
   },
-  statusOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  statusOption: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    marginBottom: 8,
-    width: '48%',
-    alignItems: 'center',
-  },
-  statusOptionText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  notesInput: {
+  commentInput: {
     borderWidth: 1,
     borderColor: '#E0E0E0',
     borderRadius: 8,
     padding: 12,
-    height: 100,
+    marginBottom: 16,
     textAlignVertical: 'top',
     backgroundColor: '#F9F9F9',
   },
-  photoActions: {
+  feedbackButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
   },
-  photoActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+  button: {
     borderRadius: 8,
-    backgroundColor: '#F0F0F0',
-    width: '48%',
-    justifyContent: 'center',
-  },
-  photoActionText: {
-    fontSize: 14,
-    color: '#6200EE',
-    marginLeft: 6,
-    fontWeight: '500',
-  },
-  photoScrollView: {
-    marginTop: 8,
-  },
-  photoContainer: {
-    position: 'relative',
-    marginRight: 8,
-  },
-  photoPreview: {
-    width: 90,
-    height: 90,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  removePhotoButton: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-  },
-  noPhotosText: {
-    fontSize: 14,
-    color: '#666',
-    fontStyle: 'italic',
-    marginTop: 8,
-  },
-  formButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-  },
-  formButton: {
-    flex: 1,
     paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    minWidth: 120,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   cancelButton: {
     backgroundColor: '#F5F5F5',
-    marginRight: 8,
   },
   cancelButtonText: {
     color: '#666',
@@ -842,25 +735,54 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     backgroundColor: '#6200EE',
-    marginLeft: 8,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   submitButtonText: {
     color: '#FFFFFF',
     fontWeight: '500',
   },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  button: {
-    backgroundColor: '#6200EE',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
   buttonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
     color: '#FFFFFF',
+  },
+  existingFeedback: {
+    padding: 4,
+  },
+  ratingDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  ratingDate: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 12,
+  },
+  feedbackComment: {
+    fontSize: 14,
+    color: '#555',
+    fontStyle: 'italic',
+    lineHeight: 22,
+  },
+  cancelRequestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F44336',
+    marginTop: 8,
+  },
+  cancelRequestText: {
+    color: '#F44336',
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
   },
 });

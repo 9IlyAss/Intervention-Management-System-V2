@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TechnicianTabLayout() {
   const insets = useSafeAreaInsets();
-  
+  console.log('TechnicianTabLayout rendered');
+
   return (
     <Tabs
       screenOptions={{
@@ -51,6 +52,7 @@ export default function TechnicianTabLayout() {
         name="Assignment"
         options={{
           title: '',
+          tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
             <View style={styles.addButtonContainer}>
               <View style={[styles.addButton, focused ? styles.addButtonFocused : null]}>

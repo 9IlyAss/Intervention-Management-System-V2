@@ -29,7 +29,7 @@ const getConfig = async () => {
 
 const technicianService = {
   // Get all interventions assigned to technician
-  getTechnicianInterventions: async (limit) => {
+  getTechnicianInterventions: async (limit = null) => {
     try {
       const endpoint = limit ? `/api/technician/interventions?limit=${limit}` : '/api/technician/interventions';
       log('Getting technician interventions...', endpoint);
@@ -57,18 +57,35 @@ const technicianService = {
   },
 
   // Update intervention status
-  updateInterventionStatus: async (interventionId, status, attachments = []) => {
-    try {
-      log(`Updating status for intervention ID: ${interventionId} to ${status}`);
-      const config = await getConfig();
-      const data = { status, attachments };
-      const response = await api.patch(`/api/technician/interventions/${interventionId}/status`, data, config);
-      return response.data;
-    } catch (error) {
-      log(`Failed to update intervention status: ${error.response?.data || error.message}`);
-      throw error;
-    }
-  },
+updateInterventionStatus: async (interventionId, status, evidence) => {
+  try {
+    log(`Updating status for intervention ID: ${interventionId} to ${status}`);
+    
+    const config = await getConfig();
+    const response = await api.patch(
+      `/api/technician/interventions/${interventionId}/status`,
+      { status, evidence },
+      config
+    );
+
+    log('Status update successful:', response.data);
+    return response.data;
+
+  } catch (error) {
+    const errorMessage = error.response?.data?.error 
+      || error.message 
+      || 'Failed to update intervention status';
+    
+    log(`Status update failed: ${errorMessage}`);
+    
+    // Create structured error object
+    const formattedError = new Error(errorMessage);
+    formattedError.status = error.response?.status || 500;
+    formattedError.details = error.response?.data?.details;
+    
+    throw formattedError;
+  }
+},
  
   // Get chat list for technician
   getChatRooms: async () => {

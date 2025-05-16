@@ -1,19 +1,17 @@
-// app/(app)/_layout.jsx
 import React from 'react';
-import { Stack } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { Redirect } from 'expo-router';
+import { Slot } from 'expo-router';
 
 export default function AppLayout() {
   const { isAuthenticated, isLoading } = useAuth();
-  
-  // If not authenticated, redirect to login
+
   if (!isLoading && !isAuthenticated) {
     return <Redirect href="/login" />;
   }
-  
-  // Layout for authenticated routes
-  return (
-    <Stack screenOptions={{ headerShown: false }} />
-  );
+
+  // Instead of Stack, render Slot to allow nested layouts to work
+  return <>{/* Fragment required if you want to add more wrappers */}
+    <Slot />
+  </>;
 }
