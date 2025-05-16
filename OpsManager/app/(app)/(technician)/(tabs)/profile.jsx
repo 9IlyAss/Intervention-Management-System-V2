@@ -48,18 +48,18 @@ export default function technicianProfile() {
       onPress: () => router.push('/(shared)/profile/personal-info'),
     },
     {
-      id: 'payment',
-      title: 'Payment Methods',
-      icon: 'card-outline',
+      id: 'password',
+      title: 'Change Password',
+      icon: 'lock-closed-outline',
       color: '#4CAF50',
-      onPress: () => router.push('/(shared)/profile/payment-methods'),
+      onPress: () => router.push('/(shared)/profile/password'),
     },
     {
-      id: 'addresses',
-      title: 'Saved Addresses',
-      icon: 'location-outline',
+      id: 'language',
+      title: 'Language & Region',
+      icon: 'globe-outline',
       color: '#2196F3',
-      onPress: () => router.push('/(shared)/profile/addresses'),
+      onPress: () => router.push('/(shared)/profile/language-region'),
     },
     {
       id: 'help',
@@ -109,7 +109,7 @@ export default function technicianProfile() {
           
           <TouchableOpacity 
             style={styles.editProfileButton}
-            onPress={() => router.push('/(shared)/profile/edit-profile')}
+            onPress={() => router.push('/(shared)/profile/personal-info')}
           >
             <Text style={styles.editProfileText}>Edit Profile</Text>
           </TouchableOpacity>

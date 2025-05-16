@@ -1,4 +1,3 @@
-// (shared)/profile/personal-info.jsx
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Image, TextInput,
@@ -11,7 +10,7 @@ import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../contexts/AuthContext';
 import authService from '../../services/authService';
-import fileService from '../../services/fileService'; // Import the file service
+import fileService from '../../services/fileService';
 
 export default function PersonalInformation() {
   const { user, setUser } = useAuth();
@@ -22,7 +21,7 @@ export default function PersonalInformation() {
   
   // Add loading state
   const [isLoading, setIsLoading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0); // Track upload progress
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   // State to track if we're in edit mode
   const [isEditing, setIsEditing] = useState(false);
@@ -32,7 +31,7 @@ export default function PersonalInformation() {
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [profileImage, setProfileImage] = useState(user?.profileImage || null);
-  const [localImageUri, setLocalImageUri] = useState(null); // Store local URI during edit
+  const [localImageUri, setLocalImageUri] = useState(null);
   
   // Properly handle skillsList initialization
   const [skills, setSkills] = useState(
@@ -40,6 +39,20 @@ export default function PersonalInformation() {
       ? user.skillsList.join(', ') 
       : ''
   );
+  
+  // Handle navigation back based on user role
+  const handleGoBack = () => {
+    if (isTechnician) {
+      // Navigate back to technician profile
+      router.replace('/(app)/(technician)/(tabs)/profile');
+    } else if (isClient) {
+      // Navigate back to client profile
+      router.replace('/(app)/(client)/(tabs)/profile');
+    } else {
+      // Fallback to generic back navigation
+      router.back();
+    }
+  };
   
   // Reset form values if user changes
   useEffect(() => {
@@ -108,51 +121,20 @@ export default function PersonalInformation() {
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.7,
-        base64: true, // Get base64 data for easier upload
       });
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
         // Set the selected image
         const selectedAsset = result.assets[0];
         
-        // Update profile image state
+        // Update local image URI state
+        setLocalImageUri(selectedAsset.uri);
+        // Update profile image state (this will be replaced with cloud URL after upload)
         setProfileImage(selectedAsset.uri);
       }
     } catch (error) {
       console.error('Error picking image:', error);
       Alert.alert('Error', 'Failed to select image.');
-    }
-  };
-  
-  // Function to upload image to server (if needed)
-  const uploadImage = async (imageUri) => {
-    // Create form data for uploading
-    const formData = new FormData();
-    
-    // Get file name from URI
-    const uriParts = imageUri.split('/');
-    const fileName = uriParts[uriParts.length - 1];
-    
-    // Append the image to form data
-    formData.append('profileImage', {
-      uri: imageUri,
-      name: fileName,
-      type: 'image/jpeg', // Adjust type as needed
-    });
-    
-    try {
-      // Upload image to server - adjust API endpoint as needed
-      const response = await api.post('/api/auth/upload-profile-image', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      
-      // Return the image URL from the server response
-      return response.data.imageUrl;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      throw new Error('Failed to upload image');
     }
   };
   
@@ -186,8 +168,33 @@ export default function PersonalInformation() {
       };
       
       // Handle profile image upload if changed
-      if (profileImage && profileImage !== user?.profileImage) {
-        userData.profileImage = profileImage;
+      if (localImageUri) {
+        try {
+          // Set initial progress
+          setUploadProgress(0);
+          
+          // Upload image using fileService
+          const cloudinaryUrl = await fileService.uploadImage(
+            localImageUri, 
+            (progress) => {
+              setUploadProgress(progress);
+            }
+          );
+          
+          console.log('Image uploaded successfully:', cloudinaryUrl);
+          
+          // Add the Cloudinary URL to the userData
+          userData.profileImage = cloudinaryUrl;
+          
+          // Reset local image URI
+          setLocalImageUri(null);
+        } catch (uploadError) {
+          console.error('Image upload error:', uploadError);
+          Alert.alert(
+            'Warning',
+            'Failed to upload profile image, but will continue updating other information.'
+          );
+        }
       }
       
       // Always include skillsList for technicians, even if empty
@@ -236,6 +243,7 @@ export default function PersonalInformation() {
     } finally {
       // End loading state
       setIsLoading(false);
+      setUploadProgress(0);
     }
   };
   
@@ -244,7 +252,13 @@ export default function PersonalInformation() {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color="#6200EE" />
-        <Text style={styles.loadingText}>Updating your profile...</Text>
+        {uploadProgress > 0 && uploadProgress < 100 ? (
+          <Text style={styles.loadingText}>
+            Uploading image: {uploadProgress}%
+          </Text>
+        ) : (
+          <Text style={styles.loadingText}>Updating your profile...</Text>
+        )}
       </View>
     );
   }
@@ -256,7 +270,7 @@ export default function PersonalInformation() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={handleGoBack}
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
@@ -402,7 +416,6 @@ export default function PersonalInformation() {
     </SafeAreaView>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -598,3 +611,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+

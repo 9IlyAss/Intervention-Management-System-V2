@@ -9,6 +9,7 @@ const technicianRoutes=require("./Routes/technicianRoutes")
 const adminRoutes=require("./Routes/adminRoutes")
 const interventionRoutes=require("./Routes/interventionRoutes")
 const uploadRoutes = require("./Routes/uploadRoutes");
+const supportRoutes=require("./Routes/supportRoutes")
 
 app.use(express.json());
 env.config();
@@ -23,6 +24,8 @@ app.use("/api/technician", technicianRoutes);
 app.use("/api/admin",adminRoutes)
 app.use("/api/interventions",interventionRoutes)
 app.use("/api/upload", uploadRoutes);
+app.use("/api/support", supportRoutes);
+
 
 app.get("/", (req, res) => {
   res.send("BACKEND API IS WORKKING!");
