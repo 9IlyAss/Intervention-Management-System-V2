@@ -124,71 +124,83 @@ export default function AssignmentScreen() {
   };
   
   // Update intervention status
-// Update intervention status
-const updateInterventionStatus = async () => {
-  if (!selectedIntervention) return;
-  
-  try {
-    let imageUrls = []
-    setIsLoading(true);
-    if (photos.length > 0) {
-            imageUrls = await fileService.uploadMultipleImages(
-            photos, 
-          );}
-    // Prepare evidence payload
-    const evidencePayload = {
-      notes: notes.trim(),
-      photos: imageUrls
-    };
-
-    // Call API to update status
-    const updatedIntervention = await technicianService.updateInterventionStatus(
-      selectedIntervention.id,
-      newStatus,
-      evidencePayload
-    );
-
-    // Update the local state with the response data
-    const updatedInterventions = interventions.map(item => 
-      item.id === selectedIntervention.id ? {
-        ...item,
-        status: updatedIntervention.status,
-        hasAttachments: updatedIntervention.evidence?.photos?.length > 0,
-        attachments: [
-          ...(item.attachments || []),
-          ...(updatedIntervention.evidence?.photos || [])
-        ]
-      } : item
-    );
-
-    setInterventions(updatedInterventions);
-    setModalVisible(false);
+  const updateInterventionStatus = async () => {
+    if (!selectedIntervention) return;
     
-    Alert.alert(
-      "Status Updated",
-      `Intervention status has been updated to ${newStatus}.`
-    );
-  } catch (err) {
-    console.error('Status update error:', err);
-    
-    let errorMessage = err.message;
-    if (err.status === 400) {
-      errorMessage = err.details || "Invalid request data";
-    } else if (err.status === 404) {
-      errorMessage = "Intervention not found";
+    try {
+      // Validate photos requirement for Completed or Cancelled status
+      if ((newStatus === "Completed" || newStatus === "Cancelled") && photos.length === 0) {
+        Alert.alert("Error", "Please add at least one photo before completing or cancelling the intervention.");
+        return;
+      }
+
+      setIsLoading(true);
+      
+      // Upload photos if there are any
+      let imageUrls = [];
+      if (photos.length > 0) {
+        imageUrls = await fileService.uploadMultipleImages(photos);
+      }
+      
+      // Prepare evidence payload
+      const evidencePayload = {
+        notes: notes.trim(),
+        photos: imageUrls
+      };
+
+      // Call API to update status
+      const updatedIntervention = await technicianService.updateInterventionStatus(
+        selectedIntervention.id,
+        newStatus,
+        evidencePayload
+      );
+
+      // Update the local state with the response data
+      const updatedInterventions = interventions.map(item => 
+        item.id === selectedIntervention.id ? {
+          ...item,
+          status: updatedIntervention.status,
+          // Properly handle the evidence photos when updating the local state
+          hasAttachments: (item.attachments?.length > 0) || 
+                          (updatedIntervention.evidence?.photos?.length > 0),
+          attachments: [
+            ...(item.attachments || []),
+            ...(updatedIntervention.evidence?.photos || [])
+          ]
+        } : item
+      );
+
+      setInterventions(updatedInterventions);
+      setModalVisible(false);
+      
+      Alert.alert(
+        "Status Updated",
+        `Intervention status has been updated to ${newStatus}.`
+      );
+    } catch (err) {
+      console.error('Status update error:', err);
+      
+      let errorMessage = "Failed to update status. Please try again.";
+      if (err.message) {
+        errorMessage = err.message;
+      }
+      if (err.status === 400) {
+        errorMessage = err.details || "Invalid request data";
+      } else if (err.status === 404) {
+        errorMessage = "Intervention not found";
+      }
+
+      Alert.alert(
+        "Update Failed",
+        errorMessage
+      );
+    } finally {
+      setIsLoading(false);
+      setSelectedIntervention(null);
+      setPhotos([]);
+      setNotes("");
     }
-
-    Alert.alert(
-      "Update Failed",
-      errorMessage
-    );
-  } finally {
-    setIsLoading(false);
-    setSelectedIntervention(null);
-    setPhotos([]);
-    setNotes("");
-  }
-};
+  };
   
   // Pick image from gallery
   const pickImage = async () => {
@@ -232,24 +244,32 @@ const updateInterventionStatus = async () => {
   };
   
   // Open chat with client
-  const handleOpenChat = (clientId) => {
-    if (!clientId || !clientId._id) {
-      Alert.alert("Error", "Client information is not available.");
-      return;
-    }
+const handleOpenChat = async (clientId) => {
+  if (!clientId || !clientId._id) {
+    Alert.alert("Error", "Client information is not available.");
+    return;
+  }
+  
+  try {
+    // Await the Promise returned by getChatByClientId
+    const chatData = await technicianService.getChatByClientId(clientId._id);
     
-    const chatRoomId = clientId._id; // Using client ID as chat room ID
+    // Extract needed data from the response
     const clientName = clientId.name || "Client";
     const clientImage = clientId.profileImage || null;
     
     router.push({
-      pathname: `/(app)/(technician)/conversation/${chatRoomId}`,
-      params: { 
+      pathname: `/(app)/(technician)/conversation/${chatData.chatRoomId}`,
+      params: {
         clientName: clientName,
         clientImage: clientImage
       }
     });
-  };
+  } catch (error) {
+    console.error("Error opening chat:", error);
+    Alert.alert("Error", "Failed to open chat room.");
+  }
+};
   
   // Helper function to get status color
   const getStatusColor = (status) => {
@@ -292,6 +312,13 @@ const updateInterventionStatus = async () => {
         return 'volume-high';
       default:
         return 'construct';
+    }
+  };
+
+  // Function to handle viewing an image
+  const handleViewImage = (imageUrl) => {
+    if (imageUrl) {
+      router.push(`/(app)/(technician)/ImageViewer?url=${encodeURIComponent(imageUrl)}`);
     }
   };
 
@@ -603,71 +630,80 @@ const updateInterventionStatus = async () => {
                   {selectedIntervention.hasAttachments && (
                     <View style={styles.detailSection}>
                       <Text style={styles.detailLabel}>Existing Attachments</Text>
-                      <View style={styles.attachmentsContainer}>
+                      <ScrollView 
+                        horizontal 
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.photoScrollView}
+                      >
                         {selectedIntervention.attachments.map((attachment, index) => (
-                          <View key={index} style={styles.attachmentItem}>
-                            <Image source={{ uri: attachment }} style={styles.attachmentThumbnail} />
-                          </View>
+                          <TouchableOpacity
+                            key={index}
+                            style={styles.photoThumbnail}
+                            onPress={() => handleViewImage(attachment)}
+                          >
+                            <Image 
+                              source={{ uri: attachment }} 
+                              style={styles.thumbnailImage}
+                              resizeMode="cover"
+                            />
+                          </TouchableOpacity>
                         ))}
-                      </View>
+                      </ScrollView>
                     </View>
                   )}
                   
                   {(newStatus === "Completed" || newStatus === "Cancelled") && (
-  <>
-    {/* Photo Upload Section */}
-    <View style={styles.detailSection}>
-      <Text style={styles.detailLabel}>
-        Add Photos
-        <Text style={styles.requiredText}> (Required)</Text>
-      </Text>
+                    <>
+                      {/* Photo Upload Section */}
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailLabel}>
+                          Add Photos
+                          <Text style={styles.requiredText}> (Required)</Text>
+                        </Text>
 
-      <View style={styles.photoContainer}>
-        {photos.map((photo, index) => (
-          <View key={index} style={styles.photoPreview}>
-            <Image source={{ uri: photo }} style={styles.photoImage} />
-            <TouchableOpacity
-              style={styles.removePhotoButton}
-              onPress={() => removePhoto(index)}
-            >
-              <Ionicons name="close-circle" size={22} color="#F44336" />
-            </TouchableOpacity>
-          </View>
-        ))}
+                        <View style={styles.photoContainer}>
+                          {photos.map((photo, index) => (
+                            <View key={index} style={styles.photoPreview}>
+                              <Image source={{ uri: photo }} style={styles.photoImage} />
+                              <TouchableOpacity
+                                style={styles.removePhotoButton}
+                                onPress={() => removePhoto(index)}
+                              >
+                                <Ionicons name="close-circle" size={22} color="#F44336" />
+                              </TouchableOpacity>
+                            </View>
+                          ))}
 
-        {/* Buttons to pick/take photo */}
-        <View style={styles.photoButtons}>
-          <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
-            <Ionicons name="image-outline" size={24} color="#6200EE" />
-            <Text style={styles.photoButtonText}>Gallery</Text>
-          </TouchableOpacity>
+                          {/* Buttons to pick/take photo */}
+                          <View style={styles.photoButtons}>
+                            <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
+                              <Ionicons name="image-outline" size={24} color="#6200EE" />
+                              <Text style={styles.photoButtonText}>Gallery</Text>
+                            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.photoButton} onPress={takePhoto}>
-            <Ionicons name="camera-outline" size={24} color="#6200EE" />
-            <Text style={styles.photoButtonText}>Camera</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
+                            <TouchableOpacity style={styles.photoButton} onPress={takePhoto}>
+                              <Ionicons name="camera-outline" size={24} color="#6200EE" />
+                              <Text style={styles.photoButtonText}>Camera</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
 
-    {/* Notes Section */}
-    <View style={styles.detailSection}>
-      <Text style={styles.detailLabel}>Notes (Optional)</Text>
-      <TextInput
-        style={styles.notesInput}
-        placeholder="Add any notes about this intervention..."
-        value={notes}
-        onChangeText={setNotes}
-        multiline
-        numberOfLines={4}
-        textAlignVertical="top"
-      />
-    </View>
-  </>
-)}
-
-                  
-                  
+                      {/* Notes Section */}
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailLabel}>Notes (Optional)</Text>
+                        <TextInput
+                          style={styles.notesInput}
+                          placeholder="Add any notes about this intervention..."
+                          value={notes}
+                          onChangeText={setNotes}
+                          multiline
+                          numberOfLines={4}
+                          textAlignVertical="top"
+                        />
+                      </View>
+                    </>
+                  )}
                 </>
               )}
             </ScrollView>
@@ -681,7 +717,10 @@ const updateInterventionStatus = async () => {
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={styles.updateButton}
+                style={[
+                  styles.updateButton,
+                  isLoading && styles.disabledButton
+                ]}
                 onPress={updateInterventionStatus}
                 disabled={isLoading}
               >
@@ -888,7 +927,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#757575",
   },
-  interventionFooter: {
+    interventionFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -988,6 +1027,9 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   detailSection: {
     marginBottom: 20,
@@ -1119,22 +1161,38 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#6200EE",
   },
+  // Added styles for horizontal scrolling thumbnail images
+  photoScrollView: {
+    flexDirection: "row",
+    marginVertical: 8,
+  },
+  photoThumbnail: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    marginRight: 8,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  thumbnailImage: {
+    width: "100%",
+    height: "100%",
+  },
   attachmentsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     marginTop: 8,
   },
   attachmentItem: {
-  width: 80,
-  height: 80,
-  borderRadius: 8, 
-  overflow: "hidden",
-  marginRight: 8,
-  marginBottom: 8,
-},
+    width: 80,
+    height: 80,
+    borderRadius: 8, 
+    overflow: "hidden",
+    marginRight: 8,
+    marginBottom: 8,
+  },
   attachmentThumbnail: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
-  },
-});
+    resizeMode: "cover"}})

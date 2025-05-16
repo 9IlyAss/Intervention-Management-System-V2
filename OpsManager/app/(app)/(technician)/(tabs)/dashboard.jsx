@@ -117,12 +117,32 @@ export default function TechnicianDashboard() {
   };
 
   // Navigate to client chat
-  const handleOpenChat = (interventionId) => {
-    router.push(
-      {pathname: `/(app)/(technician)/conversation/${interventionId}`,
-      params: { clientName, clientImage }}
-    );
-  };
+const handleOpenChat = async (clientId) => {
+  if (!clientId || !clientId._id) {
+    Alert.alert("Error", "Client information is not available.");
+    return;
+  }
+  
+  try {
+    // Await the Promise returned by getChatByClientId
+    const chatData = await technicianService.getChatByClientId(clientId._id);
+    
+    // Extract needed data from the response
+    const clientName = clientId.name || "Client";
+    const clientImage = clientId.profileImage || null;
+    
+    router.push({
+      pathname: `/(app)/(technician)/conversation/${chatData.chatRoomId}`,
+      params: {
+        clientName: clientName,
+        clientImage: clientImage
+      }
+    });
+  } catch (error) {
+    console.error("Error opening chat:", error);
+    Alert.alert("Error", "Failed to open chat room.");
+  }
+};
 
   // Helper function to get icon for category
   const getCategoryIcon = (category) => {

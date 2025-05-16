@@ -92,35 +92,57 @@ Router.get("/profile", protect, (req, res) => {
 });
 
 Router.put("/profile", protect, async (req, res) => {
-    try {
-        const { name, phone, email, profileImage } = req.body;
-        
-        // Build update object with only the fields that were provided
-        const updateFields = {};
-        if (name) updateFields.name = name;
-        if (phone) updateFields.phone = phone;
-        if (email) updateFields.email = email;
-
-        if (profileImage) updateFields.profileImage = profileImage;
-        
-        // Update user profile
-        const updatedUser = await User.findByIdAndUpdate(
-            req.user.id,
-            { $set: updateFields },
-            { new: true }
-        ).select('-password');
-        
-        if (!updatedUser) {
-            return res.status(404).json({ message: "User not found" });
-        }
-        
-        res.json(updatedUser);
-    } catch (error) {
-        console.error('Error updating profile:', error);
-        res.status(500).json({ message: "Server Error" });
+  try {
+    const { name, phone, email, profileImage, skillsList } = req.body;
+    
+    // Build update object with only the fields that were provided
+    const updateFields = {};
+    if (name) updateFields.name = name;
+    if (phone) updateFields.phone = phone;
+    if (email) updateFields.email = email;
+    if (profileImage) updateFields.profileImage = profileImage;
+    
+    if (req.user.role === 'technician' && skillsList !== undefined) {
+      updateFields.skillsList = skillsList;
+      console.log("Updating skillsList to:", skillsList);
     }
+    
+    console.log("Update fields:", updateFields);
+    
+    let updatedUser;
+    
+    if (req.user.role === 'technician') {
+      updatedUser = await Technician.findByIdAndUpdate(
+        req.user.id,
+        { $set: updateFields },
+        { new: true }
+      ).select('-password');
+    } else if (req.user.role === 'client') {
+      
+      updatedUser = await Client.findByIdAndUpdate(
+        req.user.id,
+        { $set: updateFields },
+        { new: true }
+      ).select('-password');
+    } else {
+      // Fallback to base User model
+      updatedUser = await User.findByIdAndUpdate(
+        req.user.id,
+        { $set: updateFields },
+        { new: true }
+      ).select('-password');
+    }
+    
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    res.json(updatedUser);
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    res.status(500).json({ message: "Server Error" });
+  }
 });
-
 
 Router.put('/change-password', protect, async (req, res) => {
   try {

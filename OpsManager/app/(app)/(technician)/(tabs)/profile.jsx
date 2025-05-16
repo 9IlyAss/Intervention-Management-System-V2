@@ -45,35 +45,35 @@ export default function technicianProfile() {
       title: 'Personal Information',
       icon: 'person-outline',
       color: '#6200EE',
-      onPress: () => router.push('/(app)/(technician)/edit-profile'),
+      onPress: () => router.push('/(shared)/profile/personal-info'),
     },
     {
       id: 'payment',
       title: 'Payment Methods',
       icon: 'card-outline',
       color: '#4CAF50',
-      onPress: () => router.push('/(app)/(technician)/payment-methods'),
+      onPress: () => router.push('/(shared)/profile/payment-methods'),
     },
     {
       id: 'addresses',
       title: 'Saved Addresses',
       icon: 'location-outline',
       color: '#2196F3',
-      onPress: () => router.push('/(app)/(technician)/addresses'),
+      onPress: () => router.push('/(shared)/profile/addresses'),
     },
     {
       id: 'help',
       title: 'Help & Support',
       icon: 'help-circle-outline',
       color: '#FF9800',
-      onPress: () => router.push('/(app)/(technician)/support'),
+      onPress: () => router.push('/(shared)/profile/support'),
     },
     {
       id: 'about',
       title: 'About Us',
       icon: 'information-circle-outline',
       color: '#9C27B0',
-      onPress: () => router.push('/(app)/(technician)/about'),
+      onPress: () => router.push('/(shared)/profile/about'),
     },
   ];
 
@@ -109,7 +109,7 @@ export default function technicianProfile() {
           
           <TouchableOpacity 
             style={styles.editProfileButton}
-            onPress={() => router.push('/(app)/(technician)/edit-profile')}
+            onPress={() => router.push('/(shared)/profile/edit-profile')}
           >
             <Text style={styles.editProfileText}>Edit Profile</Text>
           </TouchableOpacity>

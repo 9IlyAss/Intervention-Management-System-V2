@@ -34,22 +34,36 @@ export default function PersonalInformation() {
   const [profileImage, setProfileImage] = useState(user?.profileImage || null);
   const [localImageUri, setLocalImageUri] = useState(null); // Store local URI during edit
   
-  // Technician-specific fields from your model
+  // Properly handle skillsList initialization
   const [skills, setSkills] = useState(
-    isTechnician && user?.skillsList ? user.skillsList.join(', ') : ''
+    isTechnician && user?.skillsList && Array.isArray(user.skillsList) 
+      ? user.skillsList.join(', ') 
+      : ''
   );
   
   // Reset form values if user changes
   useEffect(() => {
     console.log('Current user object:', user);
+    console.log('Skills data:', user?.skillsList);
+    
     setName(user?.name || '');
     setEmail(user?.email || '');
     setPhone(user?.phone || '');
     setProfileImage(user?.profileImage || null);
-    setLocalImageUri(null); // Reset local image when user changes
+    setLocalImageUri(null);
     
-    if (isTechnician && user?.skillsList) {
-      setSkills(user.skillsList.join(', '));
+    // Properly initialize skills with better checks
+    if (isTechnician) {
+      if (user?.skillsList && Array.isArray(user.skillsList)) {
+        console.log('Setting skills from array:', user.skillsList);
+        setSkills(user.skillsList.join(', '));
+      } else if (user?.skillsList && typeof user.skillsList === 'string') {
+        console.log('Setting skills from string:', user.skillsList);
+        setSkills(user.skillsList);
+      } else {
+        console.log('No skills data found, setting empty string');
+        setSkills('');
+      }
     }
   }, [user]);
   
@@ -61,10 +75,17 @@ export default function PersonalInformation() {
       setEmail(user?.email || '');
       setPhone(user?.phone || '');
       setProfileImage(user?.profileImage || null);
-      setLocalImageUri(null); // Reset local image
+      setLocalImageUri(null);
       
-      if (isTechnician && user?.skillsList) {
-        setSkills(user.skillsList.join(', '));
+      // Properly reset skills
+      if (isTechnician) {
+        if (user?.skillsList && Array.isArray(user.skillsList)) {
+          setSkills(user.skillsList.join(', '));
+        } else if (user?.skillsList && typeof user.skillsList === 'string') {
+          setSkills(user.skillsList);
+        } else {
+          setSkills('');
+        }
       }
     }
     setIsEditing(!isEditing);
@@ -93,13 +114,6 @@ export default function PersonalInformation() {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         // Set the selected image
         const selectedAsset = result.assets[0];
-        
-        // Check if image is too large (optional)
-        // const fileSize = selectedAsset.fileSize; // In bytes
-        // if (fileSize > 5 * 1024 * 1024) { // larger than 5MB
-        //   Alert.alert('Image too large', 'Please select an image smaller than 5MB');
-        //   return;
-        // }
         
         // Update profile image state
         setProfileImage(selectedAsset.uri);
@@ -173,30 +187,29 @@ export default function PersonalInformation() {
       
       // Handle profile image upload if changed
       if (profileImage && profileImage !== user?.profileImage) {
-        // If your API accepts direct image URLs
         userData.profileImage = profileImage;
-        
-        // If your API requires separate image upload and returns a URL
-        // Uncomment this code if you need to upload the image first
-        /*
-        try {
-          const imageUrl = await uploadImage(profileImage);
-          userData.profileImage = imageUrl;
-        } catch (imageError) {
-          Alert.alert('Warning', 'Failed to upload profile image, but will continue updating other information.');
-        }
-        */
       }
       
-      // Add technician-specific data
-      if (isTechnician && skills) {
-        userData.skillsList = skills.split(',')
+      // Always include skillsList for technicians, even if empty
+      if (isTechnician) {
+        console.log('Processing skills:', skills);
+        
+        // Convert string to array, clean up empty items
+        const skillsArray = skills
+          .split(',')
           .map(skill => skill.trim())
           .filter(skill => skill.length > 0);
+        
+        console.log('Skills array to save:', skillsArray);
+        userData.skillsList = skillsArray;
       }
+      
+      console.log('Saving user data:', userData);
       
       // Use the auth service to update the profile
       const updatedUser = await authService.updateProfile(userData);
+      
+      console.log('Update response:', updatedUser);
       
       // Update the context with the new user data
       if (updatedUser && setUser) {
@@ -289,9 +302,6 @@ export default function PersonalInformation() {
           <Text style={styles.roleText}>{user?.role || ''}</Text>
         </View>
         
-        {/* Rest of the form - no changes needed */}
-        {/* ... Your existing form fields ... */}
-        
         {/* Basic Information Card - From User base model */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Account Information</Text>
@@ -371,8 +381,6 @@ export default function PersonalInformation() {
             </View>           
           </View>
         )}
-
-
       </ScrollView>
       
       {isEditing && (
@@ -394,6 +402,7 @@ export default function PersonalInformation() {
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

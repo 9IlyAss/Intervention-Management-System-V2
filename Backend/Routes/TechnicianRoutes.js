@@ -140,13 +140,13 @@ Router.get('/chat/:clientId', protect, async (req, res) => {
             'participants.clientId': req.params.clientId,
             'participants.technicianId': req.user.id
         })
-        .populate('participants.clientId', 'name profileImage')        // client info with profile image
-        .populate('messages.senderId', 'name profileImage');           // sender info with profile image
-        
+        .populate('participants.clientId', 'name profileImage')
+        .populate('messages.senderId', 'name profileImage');
+       
         if (!chatRoom) {
             return res.status(404).json({ error: 'Chat room not found' });
         }
-        
+       
         // Mark messages as read
         chatRoom.messages.forEach(msg => {
             if (msg.senderId._id.toString() !== req.user.id) {
@@ -154,24 +154,23 @@ Router.get('/chat/:clientId', protect, async (req, res) => {
             }
         });
         await chatRoom.save();
-        
-        const messages = chatRoom.messages.map(msg => ({
-            senderId: msg.senderId._id,
-            senderName: msg.senderId.name,
-            senderProfileImage: msg.senderId.profileImage,
-            content: msg.content,
-            sentAt: msg.createdAt,
-            read: msg.read
-        }));
-        
+       
+        // Modified response structure to match /chat-room/:chatRoomId
         res.status(200).json({
+            chatRoomId: chatRoom._id, // Added chatRoomId field
             clientId: chatRoom.participants.clientId._id,
             clientName: chatRoom.participants.clientId.name,
-            clientProfileImage: chatRoom.participants.clientId.profileImage,
-            interventionId: chatRoom.interventionId,
-            messages
+            clientImage: chatRoom.participants.clientId.profileImage, // Changed from clientProfileImage to clientImage
+            interventionId: chatRoom.interventionId, // Kept this field since it might be useful
+            messages: chatRoom.messages.map(msg => ({
+                senderId: msg.senderId._id,
+                senderName: msg.senderId.name,
+                senderImage: msg.senderId.profileImage, // Changed from senderProfileImage to senderImage
+                content: msg.content,
+                sentAt: msg.createdAt,
+                read: msg.read
+            }))
         });
-
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
