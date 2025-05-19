@@ -1,0 +1,96 @@
+/* ManageUsers.css */
+.manage-users-container {
+  display: flex;
+}
+
+.controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.add-user-btn {
+  padding: 8px 16px;
+  background-color: #4c6ef5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.add-user-btn:hover {
+  background-color: #3b5bdb;
+}
+
+.users-table {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  overflow-x: auto;
+}
+
+.role-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.role-badge.admin {
+  background-color: #343a40;
+  color: #fff;
+}
+
+.role-badge.technician {
+  background-color: #6610f2;
+  color: #fff;
+}
+
+.role-badge.client {
+  background-color: #4c6ef5;
+  color: #fff;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.edit-btn {
+  padding: 6px 10px;
+  background-color: #4c6ef5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.edit-btn:hover {
+  background-color: #3b5bdb;
+}
+
+.delete-btn {
+  padding: 6px 10px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.delete-btn:hover {
+  background-color: #c82333;
+}
+
+.no-users {
+  text-align: center;
+  padding: 20px;
+  color: #6c757d;
+}

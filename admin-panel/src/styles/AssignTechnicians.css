@@ -1,0 +1,80 @@
+/* AssignTechnicians.css */
+.assign-technicians-container {
+  display: flex;
+}
+
+.filter-controls {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filter-controls label {
+  font-weight: 500;
+}
+
+.filter-controls select {
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  background-color: white;
+}
+
+.requests-table {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  overflow-x: auto;
+}
+
+.priority-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.priority-badge.high {
+  background-color: #dc3545;
+  color: #fff;
+}
+
+.priority-badge.medium {
+  background-color: #fd7e14;
+  color: #fff;
+}
+
+.priority-badge.low {
+  background-color: #20c997;
+  color: #fff;
+}
+
+.technician-select {
+  padding: 6px 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  width: 100%;
+}
+
+.view-details-btn {
+  padding: 6px 10px;
+  background-color: #4c6ef5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.view-details-btn:hover {
+  background-color: #3b5bdb;
+}
+
+.no-requests {
+  text-align: center;
+  padding: 20px;
+  color: #6c757d;
+}
