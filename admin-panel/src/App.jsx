@@ -6,7 +6,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 // Import pages
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
-
+import AssignTechnicians from './pages/AssignTechnicians'
 
 // Protected route component
 const ProtectedRoute = ({ children }) => {
@@ -35,6 +35,22 @@ function AppRoutes() {
       
       {/* Protected routes */}
       <Route 
+        path="/" 
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        } 
+      />
+       <Route 
+        path="/assign-technicians" 
+        element={
+          <ProtectedRoute>
+            <AssignTechnicians />
+          </ProtectedRoute>
+        } 
+      />
+       <Route 
         path="/" 
         element={
           <ProtectedRoute>

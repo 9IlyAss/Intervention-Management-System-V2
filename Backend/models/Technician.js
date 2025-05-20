@@ -8,7 +8,11 @@ const TechnicianSchema = new mongoose.Schema({
   }],
   skillsList: [{
     type: String
-  }]
+  }],
+  status:{
+    type :String,
+    enum: ['Available', 'Unavailable'],
+  }
 });
 
 const Technician = User.discriminator('technician', TechnicianSchema);
