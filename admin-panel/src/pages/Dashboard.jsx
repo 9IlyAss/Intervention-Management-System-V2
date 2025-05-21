@@ -1,58 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import { requestService } from '../services/requestService';
-import { userService } from '../services/userService';
 import '../styles/Dashboard.css';
 
 function Dashboard() {
   const [stats, setStats] = useState({
-    totalInterventions: 0,
-    totalClients: 0,
-    totalTechnicians: 0,
-    interventionsToday: 0,
-    interventionsThisWeek: 0,
-    interventionsThisMonth: 0,
-    completedInterventions: 0,
-    inProgressInterventions: 0,
-    problematicInterventions: 0,
-    averageFeedbackRating: 0
+    totals: {
+      interventions: 0,
+      clients: 0,
+      technicians: 0
+    },
+    statusCounts: {
+      completed: 0,
+      inProgress: 0,
+      issues: 0
+    },
+    timeline: {
+      today: 0,
+      thisWeek: 0,
+      thisMonth: 0
+    },
+    averageRating: 0
+    
   });
+  
   const [recentRequests, setRecentRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     async function fetchDashboardData() {
       try {
-        // Fetch statistics
-        const totalInterventions = await requestService.getTotalInterventionsCount();
-        const totalClients = await userService.getClientsCount();
-        const totalTechnicians = await userService.getTechniciansCount();
-        const interventionsToday = await requestService.getInterventionsCountByPeriod('today');
-        const interventionsThisWeek = await requestService.getInterventionsCountByPeriod('week');
-        const interventionsThisMonth = await requestService.getInterventionsCountByPeriod('month');
-        const completedInterventions = await requestService.getInterventionsByStatus('completed');
-        const inProgressInterventions = await requestService.getInterventionsByStatus('in-progress');
-        const problematicInterventions = await requestService.getInterventionsByStatus('problematic');
-        const averageFeedbackRating = await requestService.getAverageFeedbackRating();
+        // Fetch dashboard stats
+        const dashboardStats = await requestService.getDashboardStats();
+        setStats(dashboardStats);
         
-        setStats({
-          totalInterventions,
-          totalClients,
-          totalTechnicians,
-          interventionsToday,
-          interventionsThisWeek,
-          interventionsThisMonth,
-          completedInterventions,
-          inProgressInterventions,
-          problematicInterventions,
-          averageFeedbackRating
-        });
-        
-        // Fetch recent requests
-        const recent = await requestService.getRecentRequests(5);
-        setRecentRequests(recent);
+        // Fetch and format recent interventions
+        const interventions = await requestService.getrequests(5);
+
+        setRecentRequests(interventions);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        setError('Failed to load dashboard data');
       } finally {
         setLoading(false);
       }
@@ -80,6 +69,12 @@ function Dashboard() {
     );
   };
 
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString();
+  };
+
   return (
     <div className="flex h-screen bg-gray-100">
       <Sidebar />
@@ -103,6 +98,10 @@ function Dashboard() {
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-700"></div>
             <span className="ml-3 text-lg text-gray-600">Loading dashboard data...</span>
           </div>
+        ) : error ? (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+            <span className="block sm:inline">{error}</span>
+          </div>
         ) : (
           <>
             {/* Stats Cards */}
@@ -116,7 +115,7 @@ function Dashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-blue-100 uppercase font-medium">Total Interventions</p>
-                  <p className="text-3xl font-bold text-white">{stats.totalInterventions}</p>
+                  <p className="text-3xl font-bold text-white">{stats.totals.interventions}</p>
                 </div>
               </div>
               
@@ -129,7 +128,7 @@ function Dashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-purple-100 uppercase font-medium">Total Clients & Techs</p>
-                  <p className="text-3xl font-bold text-white">{stats.totalClients} / {stats.totalTechnicians}</p>
+                  <p className="text-3xl font-bold text-white">{stats.totals.clients} / {stats.totals.technicians}</p>
                 </div>
               </div>
               
@@ -144,13 +143,13 @@ function Dashboard() {
                   <p className="text-sm text-green-100 uppercase font-medium">Completed / In Progress / Issues</p>
                   <div className="flex space-x-2 mt-1">
                     <div className="bg-white bg-opacity-20 rounded-full px-3 py-1">
-                      <span className="text-xl font-bold text-white">{stats.completedInterventions}</span>
+                      <span className="text-xl font-bold text-white">{stats.statusCounts.completed}</span>
                     </div>
                     <div className="bg-white bg-opacity-20 rounded-full px-3 py-1">
-                      <span className="text-xl font-bold text-white">{stats.inProgressInterventions}</span>
+                      <span className="text-xl font-bold text-white">{stats.statusCounts.inProgress}</span>
                     </div>
                     <div className="bg-white bg-opacity-20 rounded-full px-3 py-1">
-                      <span className="text-xl font-bold text-white">{stats.problematicInterventions}</span>
+                      <span className="text-xl font-bold text-white">{stats.statusCounts.issues}</span>
                     </div>
                   </div>
                 </div>
@@ -167,9 +166,9 @@ function Dashboard() {
                   <p className="text-sm text-white uppercase font-medium">AVG. FEEDBACK RATING</p>
                 </div>
                 <div className="flex items-center mt-1">
-                  <p className="text-3xl font-bold text-white mr-3">{stats.averageFeedbackRating.toFixed(1)}</p>
+                  <p className="text-3xl font-bold text-white mr-3">{stats.averageRating}</p>
                   <div className="bg-white bg-opacity-20 rounded-full px-2 py-1">
-                    {renderStarRating(stats.averageFeedbackRating)}
+                    {renderStarRating(stats.averageRating)}
                   </div>
                 </div>
               </div>
@@ -193,10 +192,10 @@ function Dashboard() {
                       </svg>
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-white">{stats.interventionsToday}</p>
+                  <p className="text-3xl font-bold text-white">{stats.timeline.today}</p>
                   <div className="mt-2 text-sm text-blue-100">
-                    <span className={stats.interventionsToday > 10 ? 'text-red-200' : 'text-green-200'}>
-                      {stats.interventionsToday > 10 ? '↑' : '↓'} {Math.abs(stats.interventionsToday - 10)}% vs avg
+                    <span className={stats.timeline.today > 10 ? 'text-red-200' : 'text-green-200'}>
+                      {stats.timeline.today > 10 ? '↑' : '↓'} {Math.abs(stats.timeline.today - 10)}% vs avg
                     </span>
                   </div>
                 </div>
@@ -209,10 +208,10 @@ function Dashboard() {
                       </svg>
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-white">{stats.interventionsThisWeek}</p>
+                  <p className="text-3xl font-bold text-white">{stats.timeline.thisWeek}</p>
                   <div className="mt-2 text-sm text-purple-100">
-                    <span className={stats.interventionsThisWeek > 50 ? 'text-red-200' : 'text-green-200'}>
-                      {stats.interventionsThisWeek > 50 ? '↑' : '↓'} {Math.abs(stats.interventionsThisWeek - 50)}% vs avg
+                    <span className={stats.timeline.thisWeek > 50 ? 'text-red-200' : 'text-green-200'}>
+                      {stats.timeline.thisWeek > 50 ? '↑' : '↓'} {Math.abs(stats.timeline.thisWeek - 50)}% vs avg
                     </span>
                   </div>
                 </div>
@@ -225,10 +224,10 @@ function Dashboard() {
                       </svg>
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-white">{stats.interventionsThisMonth}</p>
+                  <p className="text-3xl font-bold text-white">{stats.timeline.thisMonth}</p>
                   <div className="mt-2 text-sm text-indigo-100">
-                    <span className={stats.interventionsThisMonth > 200 ? 'text-red-200' : 'text-green-200'}>
-                      {stats.interventionsThisMonth > 200 ? '↑' : '↓'} {Math.abs(stats.interventionsThisMonth - 200)}% vs avg
+                    <span className={stats.timeline.thisMonth > 200 ? 'text-red-200' : 'text-green-200'}>
+                      {stats.timeline.thisMonth > 200 ? '↑' : '↓'} {Math.abs(stats.timeline.thisMonth - 200)}% vs avg
                     </span>
                   </div>
                 </div>
@@ -253,51 +252,48 @@ function Dashboard() {
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Technician</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Feedback</th>
-                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {recentRequests.length > 0 ? (
+                    {recentRequests && recentRequests.length > 0 ? (
                       recentRequests.map(request => (
-                        <tr key={request.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{request.id}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{request.clientName}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{request.issue}</td>
+                        <tr key={request._id || `request-${Math.random()}`} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            #{request._id ? request._id.substring(0, 6) : 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {request.clientName || 'Unknown Client'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {request.title || 'N/A'}
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                               ${request.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : ''}
                               ${request.status === 'In Progress' ? 'bg-blue-100 text-blue-800' : ''}
                               ${request.status === 'Completed' ? 'bg-green-100 text-green-800' : ''}
-                              ${request.status === 'Problematic' ? 'bg-red-100 text-red-800' : ''}
+                              ${request.status === 'Cancelled' ? 'bg-red-100 text-red-800' : ''}
+                              ${!request.status ? 'bg-gray-100 text-gray-800' : ''}
                             `}>
-                              {request.status}
+                              {request.status || 'Unknown'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{request.technicianName || 'Unassigned'}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {new Date(request.createdAt).toLocaleDateString()}
+                            {request.technicianName || 'Unassigned'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {request.feedbackRating ? renderStarRating(request.feedbackRating) : 'No feedback yet'}
+                            {request.category || 'General'}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button className="text-purple-600 hover:text-purple-900 mr-3">
-                              <i className="fas fa-eye"></i>
-                            </button>
-                            <button className="text-blue-600 hover:text-blue-900 mr-3">
-                              <i className="fas fa-edit"></i>
-                            </button>
-                            <button className="text-green-600 hover:text-green-900">
-                              <i className="fas fa-check-circle"></i>
-                            </button>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(request.Date)}
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="8" className="px-6 py-4 text-center text-sm text-gray-500">
+                        <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
                           No recent interventions found
                         </td>
                       </tr>

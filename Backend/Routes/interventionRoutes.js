@@ -9,18 +9,21 @@ const { protect, admin ,AdTech} = require('../middleware/authMiddleware'); // Ad
 // @access Private (Admin / Technician) 
 Router.get('/', protect, AdTech, async (req, res) => {
   try {
+     const limit = parseInt(req.query.limit); // optional query param
+
     const interventions = await Intervention.find()
       .populate('clientId', 'name')       // only populate the 'name' field of client
-      .populate('technicianId', 'name');   // only populate the 'name' field of technician
+      .populate('technicianId', 'name').sort({ createdAt: -1 }).limit(limit);   // only populate the 'name' field of technician
 
-    // Then map to customize the format
+    // Then map  to customize the format
     const formattedInterventions = interventions.map(intervention => ({
       _id: intervention._id,
       title: intervention.title,
-      description: intervention.description,
       clientName: intervention.clientId?.name || null,
       technicianName: intervention.technicianId?.name || null,
-      status: intervention.status
+      status: intervention.status,
+      category :intervention.category,
+      Date : intervention.createdAt
     }));
 
     res.json(formattedInterventions);

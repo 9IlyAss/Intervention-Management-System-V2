@@ -7,7 +7,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import AssignTechnicians from './pages/AssignTechnicians'
-
+import ManageUsers from "./pages/ManageUsers"
 // Protected route component
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -51,10 +51,10 @@ function AppRoutes() {
         } 
       />
        <Route 
-        path="/" 
+        path="/manage-users" 
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <ManageUsers />
           </ProtectedRoute>
         } 
       />
