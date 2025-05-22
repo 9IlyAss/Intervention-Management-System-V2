@@ -74,7 +74,7 @@ Router.post("/login", async (req, res) => {
                     role: user.role,
                     profileImage: user.profileImage,
                     phone:user.phone,
-
+                    
                 },
                 token,
             });

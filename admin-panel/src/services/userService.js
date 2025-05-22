@@ -91,7 +91,7 @@ export const userService = {
     try {
       log('Creating new user:', userData);
       
-      const response = await api.post('/api/admin/users', userData);
+      const response = await api.post('/api/admin', userData);
       
       log('User creation response:', response.data);
       
@@ -107,7 +107,7 @@ export const userService = {
     try {
       log(`Updating user ${id}:`, userData);
       
-      const response = await api.put(`/api/admin/users/${id}`, userData);
+      const response = await api.put(`/api/admin/${id}`, userData);
       
       log('User update response:', response.data);
       
@@ -123,7 +123,7 @@ export const userService = {
     try {
       log(`Deleting user with ID: ${id}`);
       
-      const response = await api.delete(`/api/admin/users/${id}`);
+      const response = await api.delete(`/api/admin/${id}`);
       
       log('User deletion response:', response.data);
       

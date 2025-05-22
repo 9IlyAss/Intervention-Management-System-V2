@@ -195,7 +195,7 @@ Router.get("/", protect, admin, async (req, res) => {
       });
     }
 
-    const users = await User.find({}).select("-password");
+    const users = await User.find({}).select("-password").sort({createdAt : -1});
     res.json(users);
   } catch (error) {
     console.error("Error fetching users:", error);
