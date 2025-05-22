@@ -63,7 +63,7 @@ export const requestService = {
       log(`Assigning technician ${technicianId} to intervention ${interventionId}`);
       
       const response = await api.put(
-        `/api/interventions/assign-technician/${interventionId}`,
+        `/api/admin/assign-technician/${interventionId}`,
         { technicianId }
       );
       
@@ -75,6 +75,10 @@ export const requestService = {
       throw error;
     }
   },
+  
+
+
+
   
   // Update request/intervention status
   updateRequestStatus: async (requestId, status) => {

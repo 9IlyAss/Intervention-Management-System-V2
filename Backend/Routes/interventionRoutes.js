@@ -12,21 +12,11 @@ Router.get('/', protect, AdTech, async (req, res) => {
      const limit = parseInt(req.query.limit); // optional query param
 
     const interventions = await Intervention.find()
-      .populate('clientId', 'name')       // only populate the 'name' field of client
-      .populate('technicianId', 'name').sort({ createdAt: -1 }).limit(limit);   // only populate the 'name' field of technician
+      .populate('clientId technicianId').sort({ createdAt: -1 }).limit(limit);   // only populate the 'name' field of technician
 
-    // Then map  to customize the format
-    const formattedInterventions = interventions.map(intervention => ({
-      _id: intervention._id,
-      title: intervention.title,
-      clientName: intervention.clientId?.name || null,
-      technicianName: intervention.technicianId?.name || null,
-      status: intervention.status,
-      category :intervention.category,
-      Date : intervention.createdAt
-    }));
 
-    res.json(formattedInterventions);
+
+    res.json(interventions);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

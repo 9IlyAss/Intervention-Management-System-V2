@@ -12,7 +12,11 @@ const TechnicianSchema = new mongoose.Schema({
   status:{
     type :String,
     enum: ['Available', 'Unavailable'],
-  }
+  },
+  avgRating: {
+  type: Number,
+  default: 0
+},
 });
 
 const Technician = User.discriminator('technician', TechnicianSchema);

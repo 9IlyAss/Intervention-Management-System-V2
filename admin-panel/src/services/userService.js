@@ -1,177 +1,199 @@
 // services/userService.js
-// Simulates user service that would interact with backend APIs
+// Handles API requests for user management
+import api from './api';
 
-// Mock data for users
-const MOCK_USERS = [
-  {
-    id: 1,
-    name: 'Admin User',
-    email: 'admin@example.com',
-    role: 'admin',
-    phone: '555-1000',
-    specialization: null
-  },
-  {
-    id: 201,
-    name: 'Mike Johnson',
-    email: 'mike.j@example.com',
-    role: 'technician',
-    phone: '555-1001',
-    specialization: 'Network Infrastructure'
-  },
-  {
-    id: 202,
-    name: 'Sarah Lee',
-    email: 'sarah.l@example.com',
-    role: 'technician',
-    phone: '555-1002',
-    specialization: 'Software Installation'
-  },
-  {
-    id: 203,
-    name: 'David Chen',
-    email: 'david.c@example.com',
-    role: 'technician',
-    phone: '555-1003',
-    specialization: 'Hardware Repair'
-  },
-  {
-    id: 101,
-    name: 'John Doe',
-    email: 'john.d@example.com',
-    role: 'client',
-    phone: '555-2001',
-    specialization: null
-  },
-  {
-    id: 102,
-    name: 'Jane Smith',
-    email: 'jane.s@example.com',
-    role: 'client',
-    phone: '555-2002',
-    specialization: null
-  },
-  {
-    id: 103,
-    name: 'Robert Brown',
-    email: 'robert.b@example.com',
-    role: 'client',
-    phone: '555-2003',
-    specialization: null
-  },
-  {
-    id: 104,
-    name: 'Emily Wilson',
-    email: 'emily.w@example.com',
-    role: 'client',
-    phone: '555-2004',
-    specialization: null
-  },
-  {
-    id: 105,
-    name: 'David Clark',
-    email: 'david.clark@example.com',
-    role: 'client',
-    phone: '555-2005',
-    specialization: null
+// Debug mode
+const DEBUG = true;
+
+// Helper function for logging
+const log = (...args) => {
+  if (DEBUG) {
+    console.log(...args);
   }
-];
-
-// Store mock data in localStorage for persistence during session
-if (!localStorage.getItem('mock_users')) {
-  localStorage.setItem('mock_users', JSON.stringify(MOCK_USERS));
-}
+};
 
 export const userService = {
-  // Get all users or filtered by role
-  getUsers: async (role = 'all') => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    
-    if (role === 'all') {
-      return users;
+  // Get all users
+  getUsers: async () => {
+    try {
+      log('Fetching all users');
+      
+      const response = await api.get('/api/admin');
+      
+      log('Users received:', response.data);
+      
+      // Ensure we always return an array
+      if (!response.data || !Array.isArray(response.data)) {
+        log('Warning: Users API response is not an array:', response.data);
+        return [];
+      }
+      
+      return response.data;
+    } catch (error) {
+      log('Error fetching users:', error.response?.data || error.message);
+      // Return empty array on error for safer usage
+      return [];
     }
-    
-    return users.filter(user => user.role === role);
   },
   
   // Get technicians only
   getTechnicians: async () => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    const users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    return users.filter(user => user.role === 'technician');
+    try {
+      log('Fetching technicians');
+      
+      const users = await userService.getUsers();
+      const technicians = users.filter(user => user.role === 'technician');
+      
+      log('Technicians found:', technicians.length);
+      
+      return technicians;
+    } catch (error) {
+      log('Error fetching technicians:', error.response?.data || error.message);
+      return [];
+    }
   },
   
-  // Get a specific user by ID
+  // Get clients only
+  getClients: async () => {
+    try {
+      log('Fetching clients');
+      
+      const users = await userService.getUsers();
+      const clients = users.filter(user => user.role === 'client');
+      
+      log('Clients found:', clients.length);
+      
+      return clients;
+    } catch (error) {
+      log('Error fetching clients:', error.response?.data || error.message);
+      return [];
+    }
+  },
+  
+  // Get user by ID
   getUserById: async (id) => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    const users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    return users.find(user => user.id === Number(id)) || null;
+    try {
+      log(`Fetching user with ID: ${id}`);
+      
+      const response = await api.get(`/api/admin/${id}`);
+      
+      log('User details received:', response.data);
+      
+      return response.data;
+    } catch (error) {
+      log(`Error fetching user with ID ${id}:`, error.response?.data || error.message);
+      throw error;
+    }
   },
   
-  // Create a new user
+  // Create new user
   createUser: async (userData) => {
-    await new Promise(resolve => setTimeout(resolve, 700));
-    
-    const users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    
-    const newUser = {
-      id: Math.max(0, ...users.map(u => u.id)) + 1,
-      ...userData
-    };
-    
-    const updatedUsers = [...users, newUser];
-    localStorage.setItem('mock_users', JSON.stringify(updatedUsers));
-    
-    return newUser;
+    try {
+      log('Creating new user:', userData);
+      
+      const response = await api.post('/api/admin/users', userData);
+      
+      log('User creation response:', response.data);
+      
+      return response.data;
+    } catch (error) {
+      log('Error creating user:', error.response?.data || error.message);
+      throw error;
+    }
   },
   
-  // Update a user
+  // Update user
   updateUser: async (id, userData) => {
-    await new Promise(resolve => setTimeout(resolve, 600));
-    
-    const users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    
-    const updatedUsers = users.map(user => {
-      if (user.id === Number(id)) {
-        return { ...user, ...userData };
-      }
-      return user;
-    });
-    
-    localStorage.setItem('mock_users', JSON.stringify(updatedUsers));
-    
-    return updatedUsers.find(user => user.id === Number(id));
+    try {
+      log(`Updating user ${id}:`, userData);
+      
+      const response = await api.put(`/api/admin/users/${id}`, userData);
+      
+      log('User update response:', response.data);
+      
+      return response.data;
+    } catch (error) {
+      log(`Error updating user ${id}:`, error.response?.data || error.message);
+      throw error;
+    }
   },
   
-  // Delete a user
+  // Delete user
   deleteUser: async (id) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    
-    const updatedUsers = users.filter(user => user.id !== Number(id));
-    localStorage.setItem('mock_users', JSON.stringify(updatedUsers));
-    
-    return { success: true };
+    try {
+      log(`Deleting user with ID: ${id}`);
+      
+      const response = await api.delete(`/api/admin/users/${id}`);
+      
+      log('User deletion response:', response.data);
+      
+      return response.data;
+    } catch (error) {
+      log(`Error deleting user ${id}:`, error.response?.data || error.message);
+      throw error;
+    }
   },
   
-  // Get counts for dashboard
-  getTechniciansCount: async () => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    const users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    return users.filter(user => user.role === 'technician').length;
+  // Get user counts (for dashboard)
+  getUserCounts: async () => {
+    try {
+      log('Fetching user counts');
+      
+      const users = await userService.getUsers();
+      
+      const counts = {
+        total: users.length,
+        clients: users.filter(user => user.role === 'client').length,
+        technicians: users.filter(user => user.role === 'technician').length,
+        admins: users.filter(user => user.role === 'admin').length
+      };
+      
+      log('User counts:', counts);
+      
+      return counts;
+    } catch (error) {
+      log('Error fetching user counts:', error.response?.data || error.message);
+      return {
+        total: 0,
+        clients: 0,
+        technicians: 0,
+        admins: 0
+      };
+    }
   },
   
-  getUsersCount: async () => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    const users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    return users.filter(user => user.role === 'client').length;
+  // Search users
+  searchUsers: async (query, role = null) => {
+    try {
+      log(`Searching users with query: "${query}", role: ${role}`);
+      
+      const users = await userService.getUsers();
+      
+      let filteredUsers = users;
+      
+      // Filter by role if specified
+      if (role) {
+        filteredUsers = filteredUsers.filter(user => user.role === role);
+      }
+      
+      // Filter by search query
+      if (query) {
+        const lowercaseQuery = query.toLowerCase();
+        filteredUsers = filteredUsers.filter(user => 
+          user.name?.toLowerCase().includes(lowercaseQuery) ||
+          user.email?.toLowerCase().includes(lowercaseQuery) ||
+          user.phone?.toLowerCase().includes(lowercaseQuery)
+        );
+      }
+      
+      log('Search results:', filteredUsers.length, 'users found');
+      
+      return filteredUsers;
+    } catch (error) {
+      log('Error searching users:', error.response?.data || error.message);
+      return [];
+    }
   }
 };
+
+export default userService;

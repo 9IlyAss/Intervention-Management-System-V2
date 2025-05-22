@@ -91,46 +91,66 @@ Router.delete('/interventions/:id', protect, async (req, res) => {
 });
 
 
+
 // @route POST /api/client/feedback/:interventionId
 // @desc Submit feedback for an intervention
 // @access Private (Client)
 Router.post('/feedback/:interventionId', protect, async (req, res) => {
-    try {
-        const { rating, comment } = req.body;
-        
-        if (!rating || rating < 1 || rating > 5) {
-            return res.status(400).json({ error: 'Valid rating (1-5) is required' });
-        }
+  try {
+    const { rating, comment } = req.body;
 
-        const intervention = await Intervention.findOne({
-            _id: req.params.interventionId,
-            clientId: req.user.id,
-            status: 'Completed'
-        });
-
-        if (!intervention) {
-            return res.status(404).json({ 
-                error: 'Intervention not found, not authorized, or not completed' 
-            });
-        }
-
-        const newFeedback = new Feedback({
-            rating,
-            comment: comment || '',
-            interventionId: intervention._id,
-            clientId: req.user.id,
-        });
-
-        await newFeedback.save();
-        
-        intervention.feedback = newFeedback._id;
-        await intervention.save();
-
-        res.status(201).json(newFeedback);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Valid rating (1-5) is required' });
     }
+
+    const intervention = await Intervention.findOne({
+      _id: req.params.interventionId,
+      clientId: req.user.id,
+      status: 'Completed'
+    });
+
+    if (!intervention) {
+      return res.status(404).json({
+        error: 'Intervention not found, not authorized, or not completed'
+      });
+    }
+
+    const newFeedback = new Feedback({
+      rating,
+      comment: comment || '',
+      interventionId: intervention._id,
+      clientId: req.user.id,
+    });
+
+    await newFeedback.save();
+
+    intervention.feedback = newFeedback._id;
+    await intervention.save();
+
+    // ✅ Update technician's avgRating
+    if (intervention.technicianId) {
+      const technicianId = intervention.technicianId;
+
+      // Get all interventions linked to this technician
+      const interventionIds = await Intervention.find({ technicianId }).distinct('_id');
+
+      // Get all related feedback
+      const feedbacks = await Feedback.find({ interventionId: { $in: interventionIds } });
+
+      const totalRating = feedbacks.reduce((sum, f) => sum + f.rating, 0);
+      const avgRating = feedbacks.length > 0 ? totalRating / feedbacks.length : 0;
+
+      await Technician.findByIdAndUpdate(technicianId, {
+        avgRating: avgRating.toFixed(1)
+      });
+    }
+
+    res.status(201).json(newFeedback);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
+
 
 // @route GET /api/client/chat
 // @desc Get simplified list of chat rooms for client

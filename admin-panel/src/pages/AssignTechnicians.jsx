@@ -7,88 +7,6 @@ import { requestService } from '../services/requestService';
 import { userService } from '../services/userService';
 import '../styles/AssignTechnicians.css';
 
-// Mock Data for Testing based on provided schema
-const MOCK_REQUESTS = [
-  {
-    _id: '60a1234567890123456789a1',
-    clientId: '60a0987654321098765432a1',
-    clientName: 'Ahmed Hassan',
-    clientEmail: 'ahmed.hassan@example.com',
-    clientPhone: '+212-555-1234',
-    clientprofile: "www.w3.somthing.com",
-    issue: 'Network connectivity issues in conference room',
-    location: 'Main Office',
-    category: "it",
-    createdAt: '2025-05-15T09:30:00.000Z'
-  },
-  {
-    _id: '60a1234567890123456789a2',
-    clientId: '60a0987654321098765432a2',
-    clientName: 'Sarah Johnson',
-    clientEmail: 'sarah.j@example.com',
-    clientPhone: '+212-555-5678',
-    clientprofile: "www.w3.somthing.com/sarah",
-    issue: 'Printer not responding to print commands',
-    location: 'Finance Dept',
-    category: "hardware",
-    createdAt: '2025-05-15T10:45:00.000Z'
-  },
-  {
-    _id: '60a1234567890123456789a3',
-    clientId: '60a0987654321098765432a3',
-    clientName: 'Mohammed Al-Farsi',
-    clientEmail: 'm.alfarsi@example.com',
-    clientPhone: '+212-555-9012',
-    clientprofile: "www.w3.somthing.com/mohammed",
-    issue: 'Email sync issues on mobile devices',
-    location: 'Remote',
-    category: "email",
-    createdAt: '2025-05-16T08:15:00.000Z'
-  }
-];
-
-const MOCK_TECHNICIANS = [
-  {
-    _id: '60a1234567890123456789b1',
-    name: 'Karim Bensouda',
-    email: 'karim.bensouda@example.com',
-    phone: '+212-555-2468',
-    profileImage: '/images/technicians/karim.jpg',
-    specialization: 'Network Infrastructure',
-    status: 'Available',
-    activeAssignments: 1,
-    avgrating: 4.8,
-    reviewCount: 142,
-    skills: ['Network', 'VPN', 'Router Configuration']
-  },
-  {
-    _id: '60a1234567890123456789b2',
-    name: 'Nadia Lahlou',
-    email: 'nadia.lahlou@example.com',
-    phone: '+212-555-1357',
-    profileImage: '/images/technicians/nadia.jpg',
-    specialization: 'Hardware Support',
-    status: 'Busy',
-    activeAssignments: 2,
-    avgrating: 4.6,
-    reviewCount: 98,
-    skills: ['Printers', 'Hardware', 'PC Repair']
-  },
-  {
-    _id: '60a1234567890123456789b3',
-    name: 'Youssef El Mansouri',
-    email: 'youssef.elmansouri@example.com',
-    phone: '+212-555-3690',
-    profileImage: '/images/technicians/youssef.jpg',
-    specialization: 'Software Support',
-    status: 'Available',
-    activeAssignments: 0,
-    avgrating: 4.9,
-    reviewCount: 156,
-    skills: ['Software', 'Email', 'Mobile', 'Application Troubleshooting']
-  }
-];
-
 function AssignmentWizard() {
   const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
@@ -100,19 +18,57 @@ function AssignmentWizard() {
   const [notification, setNotification] = useState({ show: false, message: '', type: '' });
 
   useEffect(() => {
-    // Simulate API fetch with mock data
     const fetchData = async () => {
       try {
-        // In production, these would be actual API calls
-        // const requestsResponse = await requestService.getPendingRequests();
-        // const techniciansResponse = await userService.getTechnicians();
+        setLoading(true);
         
-        // Using mock data for now
-        setTimeout(() => {
-          setPendingRequests(MOCK_REQUESTS);
-          setTechnicians(MOCK_TECHNICIANS);
-          setLoading(false);
-        }, 1000);
+        // Fetch pending requests and all users
+        const [requestsResponse, usersResponse] = await Promise.all([
+          requestService.getrequests(), // Get all interventions
+          userService.getUsers() // Get all users
+        ]);
+        
+        // Filter pending requests
+        const pendingRequestsData = requestsResponse.filter(request => 
+          request.status === 'Pending' && !request.technicianId
+        );
+        
+        // Format requests for the component
+        const formattedRequests = pendingRequestsData.map(request => ({
+          _id: request._id,
+          clientId: request.clientId._id || request.clientId,
+          clientName: request.clientId?.name || 'Unknown Client',
+          clientEmail: request.clientId?.email || '',
+          clientPhone: request.clientId?.phone || '',
+          clientProfile: request.clientId?.profileImage || '',
+          issue: request.title,
+          description: request.description,
+          location: request.location || 'Not specified',
+          category: request.category || 'General',
+          urgency: request.urgency || 'Normal',
+          createdAt: request.createdAt
+        }));
+        // Filter technicians from users
+        const techniciansData = usersResponse.filter(user => 
+          user.role === 'technician'
+        );
+        
+        // Format technicians for the component
+        const formattedTechnicians = techniciansData.map(technician => ({
+          _id: technician._id,
+          name: technician.name,
+          email: technician.email,
+          phone: technician.phone || '',
+          profileImage: technician.profileImage || '',
+          status: technician.status || 'Available',
+          activeAssignments: technician.activeAssignments || 0,
+          avgRating: technician.avgRating || 0,
+          skills: technician.skillsList || []
+        }));
+        
+        setPendingRequests(formattedRequests);
+        setTechnicians(formattedTechnicians);
+        
       } catch (error) {
         console.error('Error fetching data:', error);
         setNotification({
@@ -120,6 +76,7 @@ function AssignmentWizard() {
           message: 'Failed to load data. Please try again.',
           type: 'error'
         });
+      } finally {
         setLoading(false);
       }
     };
@@ -164,35 +121,36 @@ function AssignmentWizard() {
     try {
       setLoading(true);
       
-      // Prepare assignment data for the API
-      const assignmentRequestData = {
-        requestId: selectedRequest._id,
-        technicianId: selectedTechnician._id
-      };
+      // Call the actual API to assign technician
+      const assignmentResult = await requestService.assignTechnician(
+        selectedRequest._id,
+        selectedTechnician._id
+      );
       
-      // In production, this would be an actual API call
-      // await requestService.assignTechnician(assignmentRequestData);
-      
-      // Simulate API call with a delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Assignment result:', assignmentResult);
       
       // Update UI - remove the assigned request from the list
       setPendingRequests(prevRequests => 
         prevRequests.filter(req => req._id !== selectedRequest._id)
       );
       
-      showNotification(`Technician ${selectedTechnician.name} assigned to request #${selectedRequest._id.slice(-6).toUpperCase()} successfully`, 'success');
+      showNotification(
+        `Technician ${selectedTechnician.name} assigned to request #${selectedRequest._id.slice(-6).toUpperCase()} successfully`, 
+        'success'
+      );
       
-      // Reset the wizard
+      // Reset the wizard after successful assignment
       setTimeout(() => {
         setCurrentStep(1);
         setSelectedRequest(null);
         setSelectedTechnician(null);
         setSearchQuery('');
       }, 2000);
+      
     } catch (error) {
       console.error('Error assigning technician:', error);
-      showNotification('Failed to assign technician. Please try again.', 'error');
+      const errorMessage = error.response?.data?.message || 'Failed to assign technician. Please try again.';
+      showNotification(errorMessage, 'error');
     } finally {
       setLoading(false);
     }

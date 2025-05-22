@@ -37,8 +37,17 @@ function Dashboard() {
         
         // Fetch and format recent interventions
         const interventions = await requestService.getrequests(5);
-
-        setRecentRequests(interventions);
+// Then map  to customize the format
+    const formattedInterventions = interventions.map(intervention => ({
+      _id: intervention._id,
+      title: intervention.title,
+      clientName: intervention.clientId?.name || null,
+      technicianName: intervention.technicianId?.name || null,
+      status: intervention.status,
+      category :intervention.category,
+      Date : intervention.createdAt
+    }));
+        setRecentRequests(formattedInterventions);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
         setError('Failed to load dashboard data');
