@@ -28,7 +28,10 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/interventions", interventionRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/support", supportRoutes);
-
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
+});
 app.get("/", (req, res) => {
   res.send("BACKEND API IS WORKING!");
 });
