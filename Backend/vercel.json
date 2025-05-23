@@ -2,22 +2,26 @@
   "version": 2,
   "builds": [
     {
-      "src": "Backend/server.js",
+      "src": "server.js",
       "use": "@vercel/node",
       "config": {
         "includeFiles": [
-          "Backend/models/**",
-          "Backend/Routes/**",
-          "Backend/middleware/**",
-          "Backend/config/**"
+          "models/**",
+          "Routes/**",
+          "middleware/**",
+          "config/**"
         ]
       }
     }
   ],
   "routes": [
     {
+      "src": "/api/(.*)",
+      "dest": "server.js"
+    },
+    {
       "src": "/(.*)",
-      "dest": "Backend/server.js"
+      "dest": "server.js"
     }
   ]
 }
