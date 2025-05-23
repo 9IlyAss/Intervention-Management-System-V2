@@ -17,7 +17,12 @@ env.config();
 const app = express();
 
 app.use(express.json());
-app.use(cors());
+app.use(
+  cors({
+    origin: ["https://opm-omega.vercel.app", "http://localhost:9000"],
+    credentials: true,
+  })
+);
 
 ConnectDB();
 
