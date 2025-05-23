@@ -2,7 +2,7 @@
 const express = require('express');
 const Intervention = require('../models/Intervention');
 const Feedback = require('../models/Feedback');
-const ChatRoom = require('../models/ChatRoom');
+const ChatRoom = require('../../ChatRoom');
 const Router = express.Router();
 const { protect } = require("../middleware/authMiddleware");
 const mongoose = require('mongoose');

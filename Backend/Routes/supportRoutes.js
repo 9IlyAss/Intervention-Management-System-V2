@@ -2,7 +2,7 @@
 const express = require('express');
 const Router = express.Router();
 const SupportRequest = require('../models/SupportRequest');
-const ChatRoom = require('../models/ChatRoom'); // Assuming you have a ChatRoom model
+const ChatRoom = require('../../ChatRoom'); // Assuming you have a ChatRoom model
 const { protect ,admin} = require('../middleware/authMiddleware');
 
 // @route POST /api/support
