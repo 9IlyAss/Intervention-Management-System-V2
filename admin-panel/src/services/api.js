@@ -1,8 +1,7 @@
 // services/api.js
 import axios from 'axios';
+env.config();
 
-// Define your base URL - change this to your actual backend URL
-const API_URL = 'http://localhost:9000'; // Change this to your actual backend URL
 
 // Enable debug mode
 const DEBUG = true;
@@ -16,7 +15,7 @@ const log = (...args) => {
 
 // Create an axios instance
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: process.env.API_URL,
   headers: {
     'Content-Type': 'application/json',
   },

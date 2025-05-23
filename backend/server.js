@@ -15,12 +15,7 @@ const supportRoutes=require("./Routes/supportRoutes")
 app.use(express.json());
 env.config();
 
-app.use(
-  cors({
-    origin: ["https://opm-omega.vercel.app", "http://localhost:9000"],
-    credentials: true,
-  })
-);
+app.use(cors());
 const PORT = process.env.PORT || 3000;
 ConnectDB();
 app.get("/", (req, res) => {
