@@ -1,7 +1,4 @@
-const  env = require("dotenv")
 import axios from 'axios';
-env.config();
-
 
 // Enable debug mode
 const DEBUG = true;
@@ -59,22 +56,18 @@ api.interceptors.response.use(
     if (error.response) {
       log(`Error response from ${error.config?.url || 'unknown endpoint'}:`, error.response.status);
       log('Error data:', error.response.data);
-      
-      // Handle 401 errors (unauthorized)
+
       if (error.response.status === 401) {
-        // Clear tokens
         localStorage.removeItem('authToken');
         log('Token cleared due to 401 error');
-        
-        // You can trigger a redirect to login page here if needed
-        // window.location.href = '/login';
+        // Optionally redirect: window.location.href = '/login';
       }
     } else if (error.request) {
       log('No response received:', error.request.responseURL || error.request);
     } else {
       log('Error setting up request:', error.message);
     }
-    
+
     return Promise.reject(error);
   }
 );
