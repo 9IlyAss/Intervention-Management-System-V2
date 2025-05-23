@@ -14,10 +14,17 @@ const supportRoutes=require("./Routes/supportRoutes")
 app.use(express.json());
 env.config();
 
-app.use(cors());
+app.use(
+  cors({
+    origin: ["https://opm-omega.vercel.app", "http://localhost:9000"],
+    credentials: true,
+  })
+);
 const PORT = process.env.PORT || 3000;
 ConnectDB();
-
+app.get("/", (req, res) => {
+  res.end("waaaaach amonami");
+});
 app.use("/api/auth", authRoutes);
 app.use("/api/client", clientRoutes);
 app.use("/api/technician", technicianRoutes);
