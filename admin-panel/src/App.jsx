@@ -8,6 +8,8 @@ import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import AssignTechnicians from './pages/AssignTechnicians'
 import ManageUsers from "./pages/ManageUsers"
+import AllRequests from "./pages/AllRequests"
+
 // Protected route component
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -55,6 +57,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ManageUsers />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/Requests" 
+        element={
+          <ProtectedRoute>
+            <AllRequests />
           </ProtectedRoute>
         } 
       />

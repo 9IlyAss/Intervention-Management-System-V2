@@ -1,4 +1,3 @@
-// components/Sidebar.jsx
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -58,6 +57,19 @@ function Sidebar() {
             >
               <i className="fas fa-tachometer-alt mr-3"></i>
               <span>Dashboard</span>
+            </Link>
+          </li>
+          <li>
+            <Link 
+              to="/Requests" 
+              className={`flex items-center p-3 rounded-lg transition-all ${
+                isActive('/Requests') 
+                  ? 'bg-gradient-to-r from-purple-600 to-purple-800 text-white shadow-md' 
+                  : 'text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              <i className="fas fa-list-alt mr-3"></i>
+              <span>All Requests</span>
             </Link>
           </li>
           <li>
