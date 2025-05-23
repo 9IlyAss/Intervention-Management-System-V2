@@ -1,4 +1,4 @@
-// services/api.js
+const  env = require("dotenv")
 import axios from 'axios';
 env.config();
 
