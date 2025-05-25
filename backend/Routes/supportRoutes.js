@@ -2,8 +2,8 @@
 const express = require('express');
 const Router = express.Router();
 const SupportRequest = require('../models/SupportRequest');
-const ChatRoom = require('../models/ChatRoom'); // Assuming you have a ChatRoom model
 const { protect ,admin} = require('../middleware/authMiddleware');
+const sendEmail = require('../utils/sendEmail');
 
 // @route POST /api/support
 // @desc Create a new support request
@@ -23,7 +23,6 @@ Router.post('/', protect, async (req, res) => {
       userId: req.user.id,
       subject,
       message,
-      userRole: req.user.role  // Add the user's role
     });
     
     // Save the support request
@@ -57,85 +56,54 @@ Router.get('/admin', protect, admin, async (req, res) => {
   }
 });
 
+
 // @route POST /api/support/admin/respond/:requestId
-// @desc Create a chat room for a support request
+// @desc Send email response to user and mark request as resolved
 // @access Private (Admin)
 Router.post('/admin/respond/:requestId', protect, admin, async (req, res) => {
   try {
-    // Find the support request
-    const supportRequest = await SupportRequest.findById(req.params.requestId)
-      .populate('userId', '_id name email');
-    
-    if (!supportRequest) {
-      return res.status(404).json({ error: 'Support request not found' });
-    }
-    
-    // Check if a chat room already exists for this support request
-    let chatRoom = await ChatRoom.findOne({
-      'supportRequestId': supportRequest._id
-    });
-    
-    // If no chat room exists, create one
-    if (!chatRoom) {
-      chatRoom = new ChatRoom({
-        participants: {
-          clientId: supportRequest.userId._id,
-          adminId: req.user.id
-        },
-        supportRequestId: supportRequest._id,
-        messages: [{
-          senderId: req.user.id,
-          content: `RE: ${supportRequest.subject}\n\nHow can I help you with this issue?`,
-          read: false
-        }]
-      });
-      
-      await chatRoom.save();
-      
-      // Update support request status
-      supportRequest.status = 'in-progress';
-      await supportRequest.save();
-    }
-    
-    res.status(201).json({ 
-      message: 'Chat room created for support request',
-      chatRoomId: chatRoom._id
-    });
-  } catch (error) {
-    console.error('Error creating chat room:', error);
-    res.status(500).json({ error: 'Failed to create chat room' });
-  }
-});
+    const { message } = req.body;
 
-// @route PATCH /api/support/admin/:requestId
-// @desc Update support request status
-// @access Private (Admin)
-Router.patch('/admin/:requestId', protect, admin, async (req, res) => {
-  try {
-    const { status } = req.body;
-    
-    if (!status || !['new', 'in-progress', 'resolved'].includes(status)) {
-      return res.status(400).json({ error: 'Valid status is required' });
+    if (!message || message.trim() === '') {
+      return res.status(400).json({ error: 'Response message is required' });
     }
-    
-    // Update the support request
-    const supportRequest = await SupportRequest.findByIdAndUpdate(
-      req.params.requestId,
-      { status },
-      { new: true }
-    );
-    
+
+    const supportRequest = await SupportRequest.findById(req.params.requestId)
+      .populate('userId', 'name email');
+
     if (!supportRequest) {
       return res.status(404).json({ error: 'Support request not found' });
     }
-    
-    res.json({ 
-      message: 'Support request updated',
+
+    // Send response email
+    await sendEmail(
+      supportRequest.userId.email,
+      `Response to Your Support Request: ${supportRequest.subject}`,
+      `
+        <p>Hello ${supportRequest.userId.name},</p>
+        <p>Our support team has responded to your request:</p>
+        <p><strong>Subject:</strong> ${supportRequest.subject}</p>
+        <p><strong>Response:</strong> ${message}</p>
+        <p>Best regards,<br>Support Team</p>
+      `
+    );
+
+    supportRequest.response = {
+      from: req.user.name,
+      message,
+      respondedAt: new Date()
+    };
+    supportRequest.status = 'resolved'; // Always set to resolved when responding
+
+    await supportRequest.save();
+
+    res.status(200).json({ 
+      message: 'Response sent and request marked as resolved',
       supportRequest
     });
   } catch (error) {
-    console.error('Error updating support request:', error);
-    res.status(500).json({ error: 'Failed to update support request' });
+    console.error('Error responding to support request:', error);
+    res.status(500).json({ error: 'Failed to send response' });
   }
 });
 

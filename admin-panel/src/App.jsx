@@ -9,6 +9,8 @@ import Dashboard from './pages/Dashboard';
 import AssignTechnicians from './pages/AssignTechnicians'
 import ManageUsers from "./pages/ManageUsers"
 import AllRequests from "./pages/AllRequests"
+import Support from './pages/Support';
+import Reports from './pages/Reports';
 
 // Protected route component
 const ProtectedRoute = ({ children }) => {
@@ -65,6 +67,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <AllRequests />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/support" 
+        element={
+          <ProtectedRoute>
+            <Support />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/reports" 
+        element={
+          <ProtectedRoute>
+            <Reports />
           </ProtectedRoute>
         } 
       />

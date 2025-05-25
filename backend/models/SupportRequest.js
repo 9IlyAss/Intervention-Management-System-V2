@@ -17,14 +17,19 @@ const SupportRequestSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-  userRole: {  // Added user role field
-    type: String,
-    enum: ['client', 'technician', 'administrator'],
-    required: true
+  response: {
+    from : {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    message: {
+      type: String,
+      trim: true,
+    },
   },
   status: {
     type: String,
-    enum: ['new', 'in-progress', 'resolved'],
+    enum: ['new','resolved'],
     default: 'new'
   },
   createdAt: {

@@ -160,7 +160,7 @@ function AssignmentWizard() {
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
       
-      <div className="flex-1 ml-64 p-6 overflow-y-auto">
+<div className="flex-1 pt-16 md:pt-6 md:ml-64 p-4 overflow-y-auto">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
           <div className="flex items-center">

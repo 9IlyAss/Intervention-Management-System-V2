@@ -87,8 +87,8 @@ function Dashboard() {
   return (
     <div className="flex h-screen bg-gray-100">
       <Sidebar />
-      
-      <div className="flex-1 ml-64 p-8 overflow-y-auto">
+            
+<div className="flex-1 pt-16 md:pt-6 md:ml-64 p-4 overflow-y-auto">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
           <div className="flex items-center">
