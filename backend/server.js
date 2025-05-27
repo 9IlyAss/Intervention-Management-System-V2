@@ -16,10 +16,8 @@ const feedbackRoutes=require("./Routes/feedbackRoutes")
 app.use(express.json());
 env.config();
 
-app.use(cors({
-  origin: 'http://localhost:5173',
-  credentials: true
-}));const PORT = process.env.PORT || 3000;
+app.use(cors());
+const PORT = process.env.PORT || 3000;
 ConnectDB();
 app.get("/", (req, res) => {
   res.end("waaaaach amonami");
