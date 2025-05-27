@@ -285,7 +285,7 @@ const Support = () => {
                           <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-sm font-medium text-purple-900">
-                                Support Team
+                                {selectedRequest.response.from.name}
                               </span>
                               <span className="text-xs text-purple-600">
                                 {supportService.formatDate(

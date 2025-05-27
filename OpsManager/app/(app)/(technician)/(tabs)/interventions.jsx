@@ -261,12 +261,7 @@ export default function InterventionsScreen() {
         <>
           <Ionicons name="document-text-outline" size={64} color="#CCCCCC" />
           <Text style={styles.emptyText}>No service requests found</Text>
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={() => router.push('/(app)/(technician)/create')}
-          >
-            <Text style={styles.createButtonText}>Create New Request</Text>
-          </TouchableOpacity>
+
         </>
       )}
     </View>

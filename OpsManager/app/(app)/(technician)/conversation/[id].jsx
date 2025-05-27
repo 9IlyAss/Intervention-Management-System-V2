@@ -465,12 +465,7 @@ export default function ConversationScreen() {
               <Ionicons name="chatbubble-ellipses-outline" size={64} color={THEME.divider} />
               <Text style={styles.emptyText}>No messages yet</Text>
               <Text style={styles.emptySubText}>Send a message to start the conversation</Text>
-              <TouchableOpacity 
-                style={styles.startChatButton}
-                onPress={() => inputRef.current?.focus()}
-              >
-                <Text style={styles.startChatButtonText}>Start Chat</Text>
-              </TouchableOpacity>
+
             </View>
           ) : (
             <FlatList

@@ -11,12 +11,15 @@ const adminRoutes=require("./Routes/adminRoutes")
 const interventionRoutes=require("./Routes/interventionRoutes")
 const uploadRoutes = require("./Routes/uploadRoutes");
 const supportRoutes=require("./Routes/supportRoutes")
+const feedbackRoutes=require("./Routes/feedbackRoutes")
 
 app.use(express.json());
 env.config();
 
-app.use(cors());
-const PORT = process.env.PORT || 3000;
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true
+}));const PORT = process.env.PORT || 3000;
 ConnectDB();
 app.get("/", (req, res) => {
   res.end("waaaaach amonami");
@@ -28,6 +31,7 @@ app.use("/api/admin",adminRoutes)
 app.use("/api/interventions",interventionRoutes)
 app.use("/api/upload", uploadRoutes);
 app.use("/api/support", supportRoutes);
+app.use("/api/feedbacks", feedbackRoutes);
 
 
 app.get("/", (req, res) => {

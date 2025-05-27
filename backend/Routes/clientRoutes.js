@@ -6,8 +6,8 @@ const ChatRoom = require('../models/ChatRoom');
 const Router = express.Router();
 const { protect } = require("../middleware/authMiddleware");
 const mongoose = require('mongoose');
-
 const ObjectId = mongoose.Types.ObjectId;
+const Technician = require("../models/Technician");
 
 
 

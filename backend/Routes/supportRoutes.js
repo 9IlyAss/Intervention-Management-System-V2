@@ -46,7 +46,7 @@ Router.get('/admin', protect, admin, async (req, res) => {
   try {
     // Get all support requests and populate with user information
     const supportRequests = await SupportRequest.find()
-      .populate('userId', 'name email profileImage role')
+      .populate('userId', 'name email profileImage role').populate('response.from', 'name')  
       .sort({ createdAt: -1 });
     
     res.json(supportRequests);
@@ -89,7 +89,7 @@ Router.post('/admin/respond/:requestId', protect, admin, async (req, res) => {
     );
 
     supportRequest.response = {
-      from: req.user.name,
+      from: req.user._id,
       message,
       respondedAt: new Date()
     };

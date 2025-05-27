@@ -32,12 +32,17 @@ export default function LoginScreen() {
   
   const { login, isLoading, error, clearError } = useAuth();
 
-  useEffect(() => {
-    if (error) {
-      Alert.alert('Error', error);
-      clearError();
+useEffect(() => {
+  if (error) {
+    if (error === "Incorrect password") {
+      // Don't show alert for incorrect password
+      return;
     }
-  }, [error]);
+    Alert.alert('Error', error);
+    clearError();
+  }
+}, [error]);
+
 
   const validateForm = () => {
     let isValid = true;
@@ -76,7 +81,10 @@ export default function LoginScreen() {
           <SafeAreaView style={styles.headerContent}>
             <View style={styles.logoContainer}>
               <View style={styles.logoCircle}>
-                <Text style={styles.logoText}>IMS</Text>
+              <Image
+  source={require('../../assets/images/logo.jpg')}
+  style={{ width: 85, height: 50 }}
+/>
               </View>
               <Text style={styles.appName}>OPS Manager</Text>
               <Text style={styles.appTagline}>Streamline your operations</Text>
@@ -205,9 +213,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 101,
+    height: 80,
+    borderRadius: 50,
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',

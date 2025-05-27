@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import "../styles/LoginPage.css";
-import logo from "../assets/359714481_267240849279415_8934200171544069128_n-Picsart-AiImageEnhancer.jpg";
+import logo from "../assets/logo.jpg"; // Using the logo without background
 
 function LoginPage() {
   const [email, setEmail] = useState("");
@@ -88,9 +88,15 @@ function LoginPage() {
     <div className="login-container">
       <div className="login-card">
         <div className="login-left">
-          <div className="brand-logo">
-            <img src={logo} alt="Hexagon Logo" width={50} height={50} />
-          </div>
+                  <div className="flex items-center">
+                    <div className="bg-white rounded p-1 mr-2">
+                      <img 
+                        src={logo} 
+                        alt="GDS Logo" 
+                        className="h-12 w-auto object-contain"
+                      />
+                    </div>
+                  </div>
 
           <div className="welcome-content">
             <h1>

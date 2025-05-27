@@ -13,29 +13,31 @@ const {protect} = require("../middleware/authMiddleware") // Assuming you have m
 // @desc Register a new user
 // @access Public
 Router.post("/register", async (req, res) => {
-    const { name, email, password, phone , role = 'client' } = req.body;
+    const { name, email, password, phone, role = 'client' } = req.body;
 
     try {
         // Check if the user already exists
         let user = await User.findOne({ email });
         if (user) return res.status(400).json({ message: "User already exists" });
-        // Create new user
-        let newUser = new Client({ name, email, password, phone , role });
+
+        // Create new user (default role: client)
+        let newUser = new Client({ name, email, password, phone, role });
 
         // Save the user
         await newUser.save();
 
-        // Create the JWT token
+        // Create JWT token
         const payload = { user: { id: newUser._id, role: newUser.role } };
         jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "40h" }, (err, token) => {
             if (err) throw err;
+
             res.status(201).json({
                 user: {
                     _id: newUser._id,
                     name: newUser.name,
                     email: newUser.email,
                     role: newUser.role,
-                    
+                    phone: newUser.phone
                 },
                 token,
             });
@@ -44,6 +46,7 @@ Router.post("/register", async (req, res) => {
         res.status(400).json({ error: error.message });
     }
 });
+
 
 // @route POST /api/users/login
 // @desc Log in to your account
@@ -73,7 +76,7 @@ Router.post("/login", async (req, res) => {
                     email: user.email,
                     role: user.role,
                     profileImage: user.profileImage,
-                    phone:user.phone,
+                    phone:user.phone
                     
                 },
                 token,

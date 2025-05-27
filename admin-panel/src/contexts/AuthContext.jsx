@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }) => {
         
         if (isUserAuthenticated) {
           // Get user data from local storage
-          const userData = await authService.getCurrentUser();
+          const userData = await authService.getUserProfile();
           
           if (userData) {
             setCurrentUser(userData);

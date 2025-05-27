@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { HiBars3BottomRight } from 'react-icons/hi2';
 import { IoMdClose } from 'react-icons/io';
-import logo from "../assets/logo.jpg";
+import logo from "../assets/logo.jpg"; // Using the logo without background
 
 function Sidebar() {
   const location = useLocation();
@@ -29,7 +29,9 @@ function Sidebar() {
     { path: '/Requests', label: 'All Requests', icon: 'fas fa-list-alt' },
     { path: '/assign-technicians', label: 'Assign Technicians', icon: 'fas fa-user-cog' },
     { path: '/manage-users', label: 'Manage Users', icon: 'fas fa-users' },
-    { path: '/support', label: 'Support', icon: 'fas fa-headset' }
+    { path: '/support', label: 'Support', icon: 'fas fa-headset' },
+    { path: '/feedback', label: 'Feedback', icon: 'fas fa-comment-dots' }
+
   ];
 
   const renderMenuLinks = (onClick) => (
@@ -58,12 +60,13 @@ function Sidebar() {
       {/* Top bar for mobile */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-30 bg-gray-900 text-white flex items-center justify-between px-4 py-3 shadow-md">
         <div className="flex items-center">
-          <img 
-            src={logo} 
-            alt="GDS Logo" 
-            className="h-8 object-contain mr-2"
-          />
-          <span className="text-xl font-bold">IMS</span>
+          <div className="bg-white rounded p-1 mr-2">
+            <img 
+              src={logo} 
+              alt="GDS Logo" 
+              className="h-8 w-auto object-contain"
+            />
+          </div>
         </div>
         <button onClick={toggleDrawer}>
           <HiBars3BottomRight className="w-6 h-6" />
@@ -72,13 +75,18 @@ function Sidebar() {
 
       {/* Desktop Sidebar */}
       <div className="hidden md:block fixed left-0 top-0 w-64 h-full bg-gradient-to-b from-gray-800 to-gray-900 text-white shadow-lg z-20">
-        <div className="flex flex-col items-center justify-center h-28 border-b border-gray-700 p-4">
-          <img 
-            src={logo} 
-            alt="GDS Logo" 
-            className="h-16 object-contain"
-          />
+        {/* Logo Section */}
+        <div className="flex items-center justify-center h-24 border-b border-gray-700 bg-gray-800/50 p-4">
+          <div className="bg-white rounded-lg p-3 shadow-lg">
+            <img 
+              src={logo} 
+              alt="GDS Logo" 
+              className="h-12 w-auto object-contain"
+            />
+          </div>
         </div>
+        
+        {/* User Profile Section */}
         <div className="p-4 border-b border-gray-700">
           <div className="flex items-center">
             <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-purple-700 flex items-center justify-center text-white font-semibold shadow-lg">
@@ -90,7 +98,11 @@ function Sidebar() {
             </div>
           </div>
         </div>
+        
+        {/* Navigation Menu */}
         <nav className="mt-5 px-4">{renderMenuLinks()}</nav>
+        
+        {/* Logout Button */}
         <div className="absolute bottom-0 w-full p-4 border-t border-gray-700">
           <button
             onClick={handleLogout}
@@ -106,17 +118,19 @@ function Sidebar() {
       <div className={`md:hidden fixed top-0 left-0 w-64 h-full bg-gray-900 text-white z-40 shadow-lg transform transition-transform duration-300 ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
           <div className="flex items-center">
-            <img 
-              src={logo} 
-              alt="GDS Logo" 
-              className="h-8 object-contain mr-2"
-            />
-            <span className="text-xl font-bold">IMS</span>
+            <div className="bg-white rounded p-1">
+              <img 
+                src={logo} 
+                alt="GDS Logo" 
+                className="h-8 w-auto object-contain"
+              />
+            </div>
           </div>
           <button onClick={toggleDrawer}>
             <IoMdClose className="h-6 w-6 text-white" />
           </button>
         </div>
+        
         <div className="p-4 border-b border-gray-700">
           <div className="flex items-center">
             <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-purple-700 flex items-center justify-center text-white font-semibold shadow-lg">
@@ -128,7 +142,9 @@ function Sidebar() {
             </div>
           </div>
         </div>
+        
         <nav className="p-4">{renderMenuLinks(toggleDrawer)}</nav>
+        
         <div className="absolute bottom-0 w-full p-4 border-t border-gray-700">
           <button
             onClick={() => {
@@ -142,6 +158,14 @@ function Sidebar() {
           </button>
         </div>
       </div>
+
+      {/* Overlay for mobile */}
+      {drawerOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
+          onClick={toggleDrawer}
+        />
+      )}
     </>
   );
 }

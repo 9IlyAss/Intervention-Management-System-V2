@@ -2,10 +2,9 @@
   "expo": {
     "name": "OpsManager",
     "slug": "OpsManager",
-    
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logo.png",
+    "icon": "./assets/images/logo.jpg",
     "scheme": "opsmanager",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -17,7 +16,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.ilyas.opsmanager"
     },
     "web": {
       "bundler": "metro",
@@ -38,6 +38,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0605dd1a-d891-4ccf-b6c5-6341fae1b263"
+      }
     }
   }
 }

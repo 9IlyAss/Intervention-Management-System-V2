@@ -212,7 +212,7 @@ export default function ClientDashboard() {
             
             <TouchableOpacity 
               style={styles.quickActionButton}
-              onPress={() => router.push('/(app)/(client)/support')}
+              onPress={() => router.push('/(shared)/profile/support')}
             >
               <Ionicons name="help-circle" size={22} color="#6200EE" />
               <Text style={styles.quickActionText}>Get Help</Text>
@@ -223,7 +223,7 @@ export default function ClientDashboard() {
               onPress={() => router.push('/(app)/(client)/(tabs)/interventions')}
             >
               <Ionicons name="time" size={22} color="#6200EE" />
-              <Text style={styles.quickActionText}>History</Text>
+              <Text style={styles.quickActionText}>Requests</Text>
             </TouchableOpacity>
           </View>
         </View>

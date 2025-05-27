@@ -10,7 +10,8 @@ import AssignTechnicians from './pages/AssignTechnicians'
 import ManageUsers from "./pages/ManageUsers"
 import AllRequests from "./pages/AllRequests"
 import Support from './pages/Support';
-import Reports from './pages/Reports';
+// import Reports from './pages/Reports';
+import Feedback from './pages/Feedback';
 
 // Protected route component
 const ProtectedRoute = ({ children }) => {
@@ -78,11 +79,19 @@ function AppRoutes() {
           </ProtectedRoute>
         } 
       />
-      <Route 
+      {/* <Route 
         path="/reports" 
         element={
           <ProtectedRoute>
             <Reports />
+          </ProtectedRoute>
+        } 
+      /> */}
+      <Route 
+        path="/feedback" 
+        element={
+          <ProtectedRoute>
+            <Feedback />
           </ProtectedRoute>
         } 
       />

@@ -12,8 +12,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function About() {
+
+  const { user, setUser } = useAuth();
+  
+  // Determine user role from the model
+  const isClient = user?.role === 'client';
+  const isTechnician = user?.role === 'technician';
+
   // Function to handle links to email/phone
   const handleContactPress = (type, value) => {
     if (type === 'email') {
@@ -22,7 +30,18 @@ export default function About() {
       Linking.openURL(`tel:${value}`);
     }
   };
-
+  const handleGoBack = () => {
+    if (isTechnician) {
+      // Navigate back to technician profile
+      router.replace('/(app)/(technician)/(tabs)/profile');
+    } else if (isClient) {
+      // Navigate back to client profile
+      router.replace('/(app)/(client)/(tabs)/profile');
+    } else {
+      // Fallback to generic back navigation
+      router.back();
+    }
+  };
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
@@ -31,7 +50,7 @@ export default function About() {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={handleGoBack}
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
@@ -46,10 +65,11 @@ export default function About() {
       >
         {/* Company Logo */}
         <View style={styles.logoContainer}>
-          <View style={styles.logoPlaceholder}>
-            <Text style={styles.logoText}>GDE</Text>
-          </View>
-          <Text style={styles.companyName}>Golden Digital Edition</Text>
+              <Image
+  source={require('../../../assets/images/logo.jpg')}
+  style={{ width: 200, height: 109 }}
+/>          
+          <Text style={styles.companyName}>Golden Digital Service</Text>
           <Text style={styles.tagline}>Bringing tomorrow's technology to Morocco today</Text>
         </View>
         
@@ -58,10 +78,10 @@ export default function About() {
           <Text style={styles.sectionTitle}>CEO MESSAGE</Text>
           <View style={styles.quoteContainer}>
             <Text style={styles.quoteText}>
-              Golden Digital Edition est une société informatique multi-service des nouvelles technologies répond aux besoins des professionnels et particuliers. GDE s'inscrit pleinement dans le mouvement moderne de commerce et de services local afin de bien satisfait nos clients. Notre pays est dynamique et innovant, nous nous efforçons chaque jour d'être les ambassadeurs de cette modernité en marche, et de représenter au mieux une certaine idée du raffinement, de l'hospitalité ainsi que la créativité et l'exception qui caractérisent notre beau pays, le Maroc.
+              Golden Digital Service est une société informatique multi-service des nouvelles technologies répond aux besoins des professionnels et particuliers. GDE s'inscrit pleinement dans le mouvement moderne de commerce et de services local afin de bien satisfait nos clients. Notre pays est dynamique et innovant, nous nous efforçons chaque jour d'être les ambassadeurs de cette modernité en marche, et de représenter au mieux une certaine idée du raffinement, de l'hospitalité ainsi que la créativité et l'exception qui caractérisent notre beau pays, le Maroc.
             </Text>
             <Text style={styles.quoteName}>Otman Oubreik</Text>
-            <Text style={styles.quoteTitle}>CEO et Fondateur de Golden Digital Edition</Text>
+            <Text style={styles.quoteTitle}>CEO et Fondateur de Golden Digital Service</Text>
           </View>
         </View>
         
@@ -257,7 +277,6 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#6200EE',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,

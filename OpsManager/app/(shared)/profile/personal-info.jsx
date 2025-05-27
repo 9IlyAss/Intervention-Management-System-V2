@@ -262,7 +262,6 @@ export default function PersonalInformation() {
       </View>
     );
   }
-  
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />

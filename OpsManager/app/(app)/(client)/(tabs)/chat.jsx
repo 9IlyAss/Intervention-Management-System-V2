@@ -164,12 +164,7 @@ export default function ChatListScreen() {
         <>
           <Ionicons name="chatbubble-ellipses-outline" size={64} color="#CCCCCC" />
           <Text style={styles.emptyText}>No conversations yet</Text>
-          <TouchableOpacity 
-            style={styles.newChatButton} 
-            onPress={() => router.push('/(app)/(client)/support')}
-          >
-            <Text style={styles.newChatButtonText}>Contact Support</Text>
-          </TouchableOpacity>
+
         </>
       )}
     </View>
