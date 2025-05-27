@@ -205,7 +205,7 @@ function ManageUsers() {
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
             {!isAuthorized ? (
-              <div className="flex-1 ml-64">
+              <div className="flex-1 pt-16 md:pt-6 md:ml-64 p-4 overflow-y-auto">
                 <PermissionDenied message="the technician assignment feature" />
               </div>
             ) : (
