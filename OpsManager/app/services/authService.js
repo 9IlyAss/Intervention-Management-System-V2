@@ -1,12 +1,10 @@
-// app/services/authService.js
+// app/services/authService.js - Updated with forgot/reset password methods
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from './api';
 
-// Debug mode
 const DEBUG = true;
 
-// Helper function for logging
 const log = (...args) => {
   if (DEBUG) {
     console.log(...args);
@@ -14,54 +12,38 @@ const log = (...args) => {
 };
 
 const authService = {
-  // Login user
   login: async (email, password) => {
     try {
-      log('Attempting login with:', email);
+      const response = await api.post('/api/auth/login', { email, password });
       
-      const response = await api.post('/api/auth/login', { 
-        email, 
-        password 
-      });
-      
-      log('Login response received:', response.data);
-      
-      // Store token and user data
       if (response.data && response.data.token) {
         await AsyncStorage.setItem('authToken', response.data.token);
         
         if (response.data.user) {
           await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
         }
-      } else {
-        log('Warning: Response missing token or user data', response.data);
       }
       
       return response.data;
     } catch (error) {
-      log('Login error:', error.response?.data || error.message);
+      // Only log unexpected errors (non-400 status)
+      if (error.response?.status !== 400) {
+        log('Login error:', error.response?.data || error.message);
+      }
       throw error;
     }
   },
   
-  // Register user
   register: async (userData) => {
     try {
-      log('Attempting registration with:', userData.email);
-      
       const response = await api.post('/api/auth/register', userData);
       
-      log('Registration response received:', response.data);
-      
-      // Store token and user data
       if (response.data && response.data.token) {
         await AsyncStorage.setItem('authToken', response.data.token);
         
         if (response.data.user) {
           await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
         }
-      } else {
-        log('Warning: Response missing token or user data', response.data);
       }
       
       return response.data;
@@ -71,15 +53,10 @@ const authService = {
     }
   },
   
-  // Logout user
   logout: async () => {
     try {
-      log('Logging out');
-      
-      // Clear stored auth data
       await AsyncStorage.removeItem('authToken');
       await AsyncStorage.removeItem('userData');
-      
       return { success: true };
     } catch (error) {
       log('Logout error:', error.message);
@@ -87,7 +64,6 @@ const authService = {
     }
   },
   
-  // Get current user data from storage
   getCurrentUser: async () => {
     try {
       const userData = await AsyncStorage.getItem('userData');
@@ -98,7 +74,6 @@ const authService = {
     }
   },
   
-  // Check if user is authenticated
   isAuthenticated: async () => {
     try {
       const token = await AsyncStorage.getItem('authToken');
@@ -109,16 +84,10 @@ const authService = {
     }
   },
   
-  // Get user profile from API
   getUserProfile: async () => {
     try {
-      log('Fetching user profile');
-      
       const response = await api.get('/api/auth/profile');
       
-      log('Profile response received:', response.data);
-      
-      // Update stored user data if profile exists
       if (response.data && response.data.user) {
         await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
       }
@@ -129,18 +98,11 @@ const authService = {
       throw error;
     }
   },
- // Update user profile
-// Update user profile - FIXED VERSION
+
   updateProfile: async (userData) => {
     try {
-      log('Updating user profile with:', userData);
-      
-      // Make API call to update profile
       const response = await api.put('/api/auth/profile', userData);
       
-      log('Profile update response received:', response.data);
-      
-      // Update stored user data
       if (response.data) {
         await AsyncStorage.setItem('userData', JSON.stringify(response.data));
       }
@@ -151,50 +113,73 @@ const authService = {
       throw error;
     }
   },
-  // Update user password
-// Update user password 
+  
   updatePassword: async (userData) => {
-  try {
-    log('Updating user password with:', userData);
-    
-    // Make API call to update profile
-    const response = await api.put('/api/auth/change-password', userData);
-    
-    log('Password update response received:', response.data);
-    
-    // Update stored user data
-    if (response.data) {
-      await AsyncStorage.setItem('userData', JSON.stringify(response.data));
+    try {
+      const response = await api.put('/api/auth/change-password', userData);
+      
+      if (response.data) {
+        await AsyncStorage.setItem('userData', JSON.stringify(response.data));
+      }
+      
+      return response.data;
+    } catch (error) {
+      if (error.response && 
+          error.response.status === 400 && 
+          error.response.data?.message === "Current password is incorrect") {
+        
+        const validationError = new Error(error.response.data.message);
+        validationError.isValidationError = true;
+        validationError.code = "INCORRECT_PASSWORD";
+        validationError.status = 400;
+        
+        throw validationError;
+      }
+      
+      log('Error updating password:', error.response?.data || error.message);
+      throw error;
     }
-    
-    return response.data;
-  } catch (error) {
-    // Special case for incorrect password
-    if (error.response && 
-        error.response.status === 400 && 
-        error.response.data && 
-        error.response.data.message === "Current password is incorrect") {
-      
-      console.log('Creating validation error for incorrect password');
-      
-      // Create a special error type
-      const validationError = new Error(error.response.data.message);
-      validationError.isValidationError = true;
-      validationError.code = "INCORRECT_PASSWORD";
-      validationError.status = 400;
-      
-      // Use console.warn instead of log
-      console.warn('Password validation:', error.response.data.message);
-      
-      throw validationError;
-    }
-    
-    // For other errors, log as usual
-    log('Error updating password:', error.response?.data || error.message);
-    throw error;
-  }
-}
+  },
 
+  // 🆕 NEW: Forgot password method
+  forgotPassword: async (email) => {
+    try {
+      const response = await api.post('/api/auth/forgot-password', { email });
+      log('Forgot password success:', response.data);
+      return response.data;
+    } catch (error) {
+      // Only log unexpected errors (non-400/404 status)
+      if (error.response?.status !== 400 && error.response?.status !== 404) {
+        log('Forgot password error:', error.response?.data || error.message);
+      }
+      throw error;
+    }
+  },
+
+  // 🆕 NEW: Reset password method
+  resetPassword: async (token, password) => {
+    try {
+      const response = await api.post(`/api/auth/reset-password/${token}`, { password });
+      
+      // If reset is successful and returns auth token, store it
+      if (response.data && response.data.token) {
+        await AsyncStorage.setItem('authToken', response.data.token);
+        
+        if (response.data.user) {
+          await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
+        }
+      }
+      
+      log('Reset password success:', response.data);
+      return response.data;
+    } catch (error) {
+      // Only log unexpected errors (non-400 status)
+      if (error.response?.status !== 400) {
+        log('Reset password error:', error.response?.data || error.message);
+      }
+      throw error;
+    }
+  }
 };
 
 export default authService;

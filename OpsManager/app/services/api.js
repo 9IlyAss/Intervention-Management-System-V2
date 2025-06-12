@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Define your base URL - change this to your actual backend URL
 // For local development with Expo, use your computer's IP address instead of localhost
 const API_URL = 'http://192.168.100.113:9000';
+// const API_URL = 'https://opm-eight.vercel.app';
 
 // Enable debug mode
 const DEBUG = true;
@@ -16,13 +17,12 @@ const log = (...args) => {
   }
 };
 
-// Create an axios instance
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000, // 10 seconds timeout
+  timeout: 10000,
 });
 
 // Add a request interceptor to inject the auth token into requests

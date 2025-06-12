@@ -305,4 +305,29 @@ Router.post('/chat-room/:chatRoomId/message', protect, async (req, res) => {
     }
 });
 
+
+Router.patch('/status', protect, async (req, res) => {
+  try {
+    const technicianId = req.user.id;
+    const { status } = req.body;
+
+    if (!['Available', 'Unavailable'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status value' });
+    }
+
+    const technician = await Technician.findByIdAndUpdate(
+      technicianId,
+      { status },
+      { new: true }
+    );
+
+    if (!technician) {
+      return res.status(404).json({ message: 'Technician not found' });
+    }
+
+    res.json({ status: technician.status });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update status', error });
+  }
+});
 module.exports = Router;
